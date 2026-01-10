@@ -5,7 +5,7 @@
 */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import jsPDF from 'jspdf';
 import { MAX_STORY_PAGES, BACK_COVER_PAGE, TOTAL_PAGES, LETTERS_PAGE, INITIAL_PAGES, BATCH_SIZE, DECISION_PAGES, GENRES, ART_STYLES, TONES, LANGUAGES, ComicFace, Beat, Persona, LetterItem } from './types';
 import { Setup } from './Setup';
@@ -17,10 +17,32 @@ import { soundManager } from './SoundManager';
 import { saveGame, loadGame, clearSave } from './db';
 
 // --- Constants ---
-const MODEL_V3 = "gemini-3-pro-image-preview";
-const MODEL_IMAGE_GEN_NAME = MODEL_V3;
-const MODEL_TEXT_NAME = MODEL_V3;
+const MODEL_IMAGE_GEN_NAME = "gemini-3-pro-image-preview";
+const MODEL_TEXT_NAME = "gemini-3-pro-preview";
 const MODEL_VEO = 'veo-3.1-fast-generate-preview';
+
+// --- Utility: Retry Logic ---
+const callWithRetry = async <T,>(fn: () => Promise<T>, retries = 3, initialDelay = 2000): Promise<T> => {
+    let lastError;
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await fn();
+        } catch (e: any) {
+            lastError = e;
+            const msg = JSON.stringify(e) + String(e); // Robust string conversion
+            const isOverloaded = msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE');
+            
+            if (isOverloaded && i < retries - 1) {
+                const delay = initialDelay * Math.pow(2, i);
+                console.warn(`Model overloaded (503). Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            throw e;
+        }
+    }
+    throw lastError;
+};
 
 const App: React.FC = () => {
   // --- API Key Hook ---
@@ -118,12 +140,19 @@ const App: React.FC = () => {
   };
 
   const handleAPIError = (e: any) => {
-    const msg = String(e);
-    console.error("API Error:", msg);
+    let msg = '';
+    if (typeof e === 'string') msg = e;
+    else if (e instanceof Error) msg = e.message + ' ' + JSON.stringify(e);
+    else msg = JSON.stringify(e);
+    
+    console.error("API Error caught in handler:", msg);
+    
+    // Aggressively check for permission/billing errors
     if (
       msg.includes('Requested entity was not found') || 
       msg.includes('API_KEY_INVALID') || 
-      msg.toLowerCase().includes('permission denied')
+      msg.includes('PERMISSION_DENIED') ||
+      msg.includes('403')
     ) {
       setShowApiKeyDialog(true);
     }
@@ -156,10 +185,16 @@ const App: React.FC = () => {
       `;
       try {
         const ai = getAI();
-        const res = await ai.models.generateContent({ model: MODEL_TEXT_NAME, contents: prompt, config: { responseMimeType: 'application/json' } });
+        // Use retry wrapper
+        const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({ 
+            model: MODEL_TEXT_NAME, 
+            contents: prompt, 
+            config: { responseMimeType: 'application/json' } 
+        }));
         const rawText = res.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "[]";
         return JSON.parse(rawText);
       } catch (e) {
+          handleAPIError(e); // Ensure errors here can also trigger dialogs
           return [{ user: "Editor", location: "Office", text: "Thanks for reading!", sentiment: "positive" }];
       }
   };
@@ -185,11 +220,12 @@ const App: React.FC = () => {
 
     try {
         const ai = getAI();
-        const res = await ai.models.generateContent({ 
+        // Use retry wrapper
+        const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({ 
             model: MODEL_TEXT_NAME, 
             contents: prompt, 
             config: { responseMimeType: 'application/json' } 
-        });
+        }));
         
         const raw = res.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "{}";
         const data = JSON.parse(raw);
@@ -200,6 +236,7 @@ const App: React.FC = () => {
         
     } catch(e) {
         console.error("Bio generation failed", e);
+        handleAPIError(e);
     }
   };
 
@@ -220,8 +257,12 @@ const App: React.FC = () => {
        FOCUS: ${p.narrative?.focus_char}
        CAPTION: "${p.narrative?.caption || ''}"
        DIALOGUE: "${p.narrative?.dialogue || ''}"
-       ${p.resolvedChoice ? `>> PLAYER CHOSE: "${p.resolvedChoice}"` : ''}`
+       ${p.resolvedChoice ? `>> CRITICAL: PLAYER CHOSE: "${p.resolvedChoice}" <<` : ''}`
     ).join('\n---\n');
+
+    // Check for recent choice to enforce continuity
+    const lastPage = relevantHistory[relevantHistory.length - 1];
+    const recentChoice = lastPage?.resolvedChoice;
 
     // --- Dynamic Character Injection & Deep Relationship Context ---
     let charInstruction = `ROLE: HERO (Protagonist) - Name: ${heroRef.current.name || 'Unknown'}.`;
@@ -257,10 +298,15 @@ const App: React.FC = () => {
     let instruction = `Continue the story. ALL OUTPUT TEXT MUST BE IN ${langName.toUpperCase()}. ${coreDriver} ${guardrails}`;
     if (richMode) instruction += " RICH MODE: Use internal monologue captions to reveal hidden depths, fears, and doubts.";
 
+    // Logic for Decision Consequences
+    if (recentChoice) {
+        instruction += `\n\n*** IMMEDIATE ACTION REQUIRED ***\nThe user just made a decision: "${recentChoice}".\nThis page MUST strictly follow that choice. Do not ignore it. The scene, the action, and the dialogue must demonstrate the immediate consequence of choosing "${recentChoice}".`;
+    }
+
     if (isFinalPage) {
         instruction += " FINAL PAGE. Wrap up the immediate conflict but leave the emotional arc open or changed. End with 'TO BE CONTINUED...'.";
     } else if (isDecisionPage) {
-        instruction += " Create a high-stakes DILEMMA. The choice should test the Hero's values or relationship with the Co-Star/Villain.";
+        instruction += " \n\n*** GENERATE DECISION ***\nCreate a high-stakes DILEMMA for the end of this page. The choices must represent genuinely different paths (e.g. Aggression vs. Diplomacy, Risk vs. Safety, Selfishness vs. Altruism) that will significantly alter the story's direction.";
     } else {
          if (pageNum === 1) instruction += " INCITING INCIDENT. Start in media res if possible. Disrupt the status quo.";
          else if (pageNum <= 4) instruction += " RISING ACTION. Show the dynamic between Hero and Co-Star (if present).";
@@ -272,7 +318,7 @@ const App: React.FC = () => {
     const diaLimit = richMode ? "max 35 words" : "max 15 words";
 
     const prompt = `
-You are an expert comic book writer (e.g. Neil Gaiman, Brian K. Vaughan) known for character-driven narratives.
+You are an expert comic book writer (e.g. Neil Gaiman, Brian K. Vaughan) known for character-driven narratives and branching storylines.
 PAGE ${pageNum} of ${MAX_STORY_PAGES}.
 TARGET LANGUAGE: ${langName}.
 
@@ -286,7 +332,7 @@ ${historyText.length > 0 ? historyText : "This is Page 1. Start the adventure. E
 
 RULES:
 1. NO REPETITION of previous dialogue or captions.
-2. SHOW, DON'T TELL: Use the 'scene' description to convey emotion and relationship dynamics (e.g. 'Hero looks concerned at Friend').
+2. SHOW, DON'T TELL: Use the 'scene' description to convey emotion and relationship dynamics.
 3. OUTPUT LANGUAGE: ${langName}.
 
 INSTRUCTION: ${instruction}
@@ -297,12 +343,13 @@ OUTPUT STRICT JSON ONLY:
   "dialogue": "Speech in ${langName}. (${diaLimit}). Natural, character-specific.",
   "scene": "Visual description (ALWAYS IN ENGLISH). Detail character expressions, lighting, and action. Mention 'HERO', 'CO-STAR', or 'VILLAIN' if present.",
   "focus_char": "hero" OR "friend" OR "villain" OR "other",
-  "choices": ["Option A", "Option B"] (Only if decision page)
+  "choices": ["Option A", "Option B"] (Only if decision page. Must be distinct actions.)
 }
 `;
     try {
         const ai = getAI();
-        const res = await ai.models.generateContent({ model: MODEL_TEXT_NAME, contents: prompt, config: { responseMimeType: 'application/json' } });
+        // Use retry wrapper
+        const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({ model: MODEL_TEXT_NAME, contents: prompt, config: { responseMimeType: 'application/json' } }));
         let rawText = res.text || "{}";
         rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
         
@@ -331,11 +378,12 @@ OUTPUT STRICT JSON ONLY:
       // Use selectedArtStyle instead of just genre for the character sheet
       try {
           const ai = getAI();
-          const res = await ai.models.generateContent({
+          // Use retry wrapper
+          const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
               model: MODEL_IMAGE_GEN_NAME,
-              contents: { text: `STYLE: Masterpiece ${selectedArtStyle} character sheet, detailed ink, neutral background. FULL BODY. Character: ${desc}` },
+              contents: { parts: [{ text: `STYLE: Masterpiece ${selectedArtStyle} character sheet, detailed ink, neutral background. FULL BODY. Character: ${desc}` }] },
               config: { imageConfig: { aspectRatio: '1:1' } }
-          });
+          }));
           const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
           if (part?.inlineData?.data) return { base64: part.inlineData.data, desc };
           throw new Error("Failed");
@@ -346,18 +394,18 @@ OUTPUT STRICT JSON ONLY:
   };
 
   const generateImage = async (beat: Beat, type: ComicFace['type']): Promise<string> => {
-    const contents = [];
+    const parts = [];
     if (heroRef.current?.base64) {
-        contents.push({ text: "REFERENCE 1 [HERO]:" });
-        contents.push({ inlineData: { mimeType: 'image/jpeg', data: heroRef.current.base64 } });
+        parts.push({ text: "REFERENCE 1 [HERO]:" });
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: heroRef.current.base64 } });
     }
     if (friendRef.current?.base64) {
-        contents.push({ text: "REFERENCE 2 [CO-STAR]:" });
-        contents.push({ inlineData: { mimeType: 'image/jpeg', data: friendRef.current.base64 } });
+        parts.push({ text: "REFERENCE 2 [CO-STAR]:" });
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: friendRef.current.base64 } });
     }
     if (villainRef.current?.base64) {
-        contents.push({ text: "REFERENCE 3 [VILLAIN]:" });
-        contents.push({ inlineData: { mimeType: 'image/jpeg', data: villainRef.current.base64 } });
+        parts.push({ text: "REFERENCE 3 [VILLAIN]:" });
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: villainRef.current.base64 } });
     }
 
     // Combine art style and genre for the prompt
@@ -379,15 +427,16 @@ OUTPUT STRICT JSON ONLY:
         if (beat.dialogue) promptText += ` INCLUDE SPEECH BUBBLE: "${beat.dialogue}"`;
     }
 
-    contents.push({ text: promptText });
+    parts.push({ text: promptText });
 
     try {
         const ai = getAI();
-        const res = await ai.models.generateContent({
+        // Use retry wrapper
+        const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
           model: MODEL_IMAGE_GEN_NAME,
-          contents: contents,
+          contents: { parts },
           config: { imageConfig: { aspectRatio: '2:3' } }
-        });
+        }));
         const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
         if (part?.inlineData?.data) {
              soundManager.play('success'); // Play sound on success
@@ -426,17 +475,20 @@ OUTPUT STRICT JSON ONLY:
       try {
           const ai = getAI();
           const base64Data = face.imageUrl.split(',')[1];
-          let operation = await ai.models.generateVideos({
+          
+          // Retry Veo launch
+          let operation = await callWithRetry<any>(() => ai.models.generateVideos({
               model: MODEL_VEO,
               image: { imageBytes: base64Data, mimeType: 'image/jpeg' },
               prompt: `Cinematic subtle motion, 4k, ${face.narrative?.scene || 'comic book scene'}`,
               config: { numberOfVideos: 1, resolution: '720p', aspectRatio: '9:16' }
-          });
+          }));
           
           // Poll
           while (!operation.done) {
               await new Promise(r => setTimeout(r, 4000));
-              operation = await ai.operations.getVideosOperation({ operation });
+              // Retry Veo status check
+              operation = await callWithRetry<any>(() => ai.operations.getVideosOperation({ operation }));
           }
           
           const uri = operation.response?.generatedVideos?.[0]?.video?.uri;
