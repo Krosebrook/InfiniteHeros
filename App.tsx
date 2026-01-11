@@ -265,12 +265,12 @@ const App: React.FC = () => {
     const recentChoice = lastPage?.resolvedChoice;
 
     // --- Dynamic Character Injection & Deep Relationship Context ---
-    let charInstruction = `ROLE: HERO (Protagonist) - Name: ${heroRef.current.name || 'Unknown'}.`;
+    let charInstruction = `ROLE: HERO (Protagonist) - Name: ${heroRef.current.name || 'Unknown'}. BACKSTORY: ${heroRef.current.backstory || ''}. VOICE: Determined, Driving.`;
     if (friendRef.current) {
-        charInstruction += `\nROLE: CO-STAR (Ally) - Name: ${friendRef.current.name || 'Unknown'}. RELATIONSHIP: Deep bond/Shared History. Dialogue should be familiar, maybe even using internal logic, banter, or nicknames. They are the emotional anchor.`;
+        charInstruction += `\nROLE: CO-STAR (Ally) - Name: ${friendRef.current.name || 'Unknown'}. BACKSTORY: ${friendRef.current.backstory || ''}. RELATIONSHIP: Deep bond/Shared History. VOICE: Supportive, grounding, perhaps sarcastic if genre fits. Dialogue should be familiar, maybe even using internal logic, banter, or nicknames.`;
     }
     if (villainRef.current) {
-        charInstruction += `\nROLE: VILLAIN (Antagonist) - Name: ${villainRef.current.name || 'Unknown'}. RELATIONSHIP: The dark reflection. Interactions should be personal and psychological, not just physical conflict. They know how to hurt the Hero.`;
+        charInstruction += `\nROLE: VILLAIN (Antagonist) - Name: ${villainRef.current.name || 'Unknown'}. BACKSTORY: ${villainRef.current.backstory || ''}. RELATIONSHIP: The dark reflection. VOICE: Calculating, personal, psychological. They know how to hurt the Hero.`;
     }
 
     // --- Villain Logic ---
@@ -301,6 +301,11 @@ const App: React.FC = () => {
     // Logic for Decision Consequences
     if (recentChoice) {
         instruction += `\n\n*** IMMEDIATE ACTION REQUIRED ***\nThe user just made a decision: "${recentChoice}".\nThis page MUST strictly follow that choice. Do not ignore it. The scene, the action, and the dialogue must demonstrate the immediate consequence of choosing "${recentChoice}".`;
+    }
+
+    // CONTINUITY LOGIC
+    if (lastPage?.narrative?.dialogue) {
+         instruction += `\n\n*** DIALOGUE CONTINUITY ***\nPrevious line: "${lastPage.narrative.dialogue}".\nIf characters are conversing, ensure the new line directly responds to or logically follows the previous one. Maintain the rhythm of speech.`;
     }
 
     if (isFinalPage) {
@@ -334,6 +339,7 @@ RULES:
 1. NO REPETITION of previous dialogue or captions.
 2. SHOW, DON'T TELL: Use the 'scene' description to convey emotion and relationship dynamics.
 3. OUTPUT LANGUAGE: ${langName}.
+4. MAINTAIN VOICE: Ensure characters sound like themselves based on their role and backstory.
 
 INSTRUCTION: ${instruction}
 
