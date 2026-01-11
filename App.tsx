@@ -460,7 +460,8 @@ OUTPUT STRICT JSON ONLY:
       const face = historyRef.current.find(f => f.id === faceId);
       if (!face || !face.narrative) return;
       
-      updateFaceState(faceId, { isLoading: true });
+      // Clear videoUrl when regenerating base image
+      updateFaceState(faceId, { isLoading: true, videoUrl: undefined });
       const url = await generateImage(face.narrative, face.type);
       updateFaceState(faceId, { imageUrl: url, isLoading: false });
   };
@@ -469,6 +470,10 @@ OUTPUT STRICT JSON ONLY:
       const face = historyRef.current.find(f => f.id === faceId);
       if (!face || !face.imageUrl) return;
 
+      // Ensure API Key is validated for Veo usage
+      const hasKey = await validateApiKey();
+      if (!hasKey) return;
+
       soundManager.play('click');
       updateFaceState(faceId, { isAnimating: true });
       
@@ -476,11 +481,16 @@ OUTPUT STRICT JSON ONLY:
           const ai = getAI();
           const base64Data = face.imageUrl.split(',')[1];
           
+          let veoprompt = `Cinematic subtle motion, 4k, ${face.narrative?.scene || 'comic book scene'}`;
+          if (face.type === 'cover') {
+              veoprompt = "Cinematic slow motion, epic comic book cover, dramatic lighting, 4k";
+          }
+
           // Retry Veo launch
           let operation = await callWithRetry<any>(() => ai.models.generateVideos({
               model: MODEL_VEO,
               image: { imageBytes: base64Data, mimeType: 'image/jpeg' },
-              prompt: `Cinematic subtle motion, 4k, ${face.narrative?.scene || 'comic book scene'}`,
+              prompt: veoprompt,
               config: { numberOfVideos: 1, resolution: '720p', aspectRatio: '9:16' }
           }));
           

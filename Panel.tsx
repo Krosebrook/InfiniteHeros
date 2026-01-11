@@ -73,20 +73,20 @@ export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBo
                 </div>
             )}
 
-            {/* Utility Controls (Hover only) */}
-            {!face.isAnimating && face.type === 'story' && face.imageUrl && (
-                <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-40">
+            {/* Utility Controls */}
+            {!face.isAnimating && (face.type === 'story' || face.type === 'cover') && face.imageUrl && (
+                <div className="absolute top-2 right-2 flex flex-col gap-2 z-40 transition-opacity duration-300 opacity-100 md:opacity-0 md:group-hover:opacity-100">
                     {!face.videoUrl && (
                         <button onClick={(e) => { e.stopPropagation(); onAnimate(face.id); }} 
-                                className="bg-white/90 p-2 rounded-full border-2 border-black hover:bg-yellow-300 shadow-md"
+                                className="bg-white/90 p-2 rounded-full border-2 border-black hover:bg-yellow-300 shadow-md transform hover:scale-110 transition-transform"
                                 title="Animate with Veo">
-                            🎬
+                            <span className="text-xl">🎬</span>
                         </button>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); onRegenerate(face.id); }}
-                            className="bg-white/90 p-2 rounded-full border-2 border-black hover:bg-blue-300 shadow-md"
+                            className="bg-white/90 p-2 rounded-full border-2 border-black hover:bg-blue-300 shadow-md transform hover:scale-110 transition-transform"
                             title="Regenerate Image">
-                        🔄
+                        <span className="text-xl">🔄</span>
                     </button>
                 </div>
             )}
