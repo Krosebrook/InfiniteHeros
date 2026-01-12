@@ -25,6 +25,9 @@ interface SetupProps {
     onFriendUpload: (file: File) => void;
     onVillainUpload: (file: File) => void;
     onAutoGenerateVillain: () => void;
+    onAutoGenerateHero: () => void;
+    onAutoGenerateFriend: () => void;
+    onGenerateBios: () => void;
     onGenreChange: (val: string) => void;
     onArtStyleChange: (val: string) => void;
     onLanguageChange: (val: string) => void;
@@ -115,16 +118,35 @@ export const Setup: React.FC<SetupProps> = (props) => {
                         <div className={`p-3 border-4 border-dashed ${props.hero ? 'border-green-500 bg-green-50' : 'border-blue-300 bg-blue-50'} transition-colors flex-1 flex flex-col`}>
                             <div className="flex justify-between items-center mb-2">
                                 <p className="font-comic text-lg uppercase font-bold text-blue-900">REQUIRED</p>
-                                {props.hero && <span className="text-green-600 font-bold font-comic text-sm animate-pulse">✓ READY</span>}
+                                {props.hero ? (
+                                    <span className="text-green-600 font-bold font-comic text-sm animate-pulse">✓ READY</span>
+                                ) : (
+                                    <button onClick={() => { playClick(); props.onAutoGenerateHero(); }} className="text-[10px] font-bold bg-black text-white px-2 py-1 hover:bg-gray-800 border border-transparent uppercase">
+                                       AUTO-GENERATE
+                                    </button>
+                                )}
                             </div>
                             
                             {props.hero ? (
                                 <div className="flex flex-col items-center gap-2 mt-2">
                                      <img src={`data:image/jpeg;base64,${props.hero.base64}`} alt="Hero" className="w-24 h-24 object-cover border-2 border-black rotate-[-2deg] shadow-sm" />
-                                     <label className="cursor-pointer comic-btn bg-yellow-400 text-black text-xs px-3 py-2 hover:bg-yellow-300 w-full text-center" onClick={playClick}>
-                                         CHANGE HERO
-                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => { playClick(); e.target.files?.[0] && props.onHeroUpload(e.target.files[0]); }} />
-                                     </label>
+                                     
+                                     {props.hero.name && (
+                                         <div className="bg-yellow-100 p-2 border border-black w-full text-left rotate-1">
+                                             <p className="font-comic text-lg leading-none">{props.hero.name}</p>
+                                             <p className="font-sans text-[10px] leading-tight text-gray-600 line-clamp-3">{props.hero.backstory}</p>
+                                         </div>
+                                     )}
+
+                                     <div className="flex w-full gap-2">
+                                        <label className="cursor-pointer comic-btn bg-yellow-400 text-black text-xs px-2 py-2 hover:bg-yellow-300 flex-1 text-center" onClick={playClick}>
+                                            UPLOAD
+                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { playClick(); e.target.files?.[0] && props.onHeroUpload(e.target.files[0]); }} />
+                                        </label>
+                                        <button className="comic-btn bg-white text-black text-xs px-2 py-2 hover:bg-gray-100 flex-1 text-center" onClick={() => { playClick(); props.onAutoGenerateHero(); }}>
+                                            REGENERATE
+                                        </button>
+                                     </div>
                                 </div>
                             ) : (
                                 <label className="comic-btn bg-blue-500 text-white text-lg px-3 py-6 block w-full hover:bg-blue-400 cursor-pointer text-center h-full flex items-center justify-center" onClick={playClick}>
@@ -143,17 +165,32 @@ export const Setup: React.FC<SetupProps> = (props) => {
                         <div className={`p-2 border-2 border-dashed ${props.friend ? 'border-green-500 bg-green-50' : 'border-purple-300 bg-purple-50'}`}>
                             <div className="flex justify-between items-center">
                                 <p className="font-comic text-sm uppercase font-bold text-purple-900">CO-STAR (OPTIONAL)</p>
-                                {props.friend ? (
-                                    <label className="text-[10px] underline cursor-pointer hover:text-blue-500" onClick={playClick}>CHANGE
+                                <div className="flex gap-1">
+                                    {!props.friend && (
+                                        <button onClick={() => { playClick(); props.onAutoGenerateFriend(); }} className="text-[10px] font-bold bg-black text-white px-2 py-1 hover:bg-gray-800 border border-transparent uppercase">
+                                            AUTO
+                                        </button>
+                                    )}
+                                    <label className="text-[10px] font-bold bg-purple-200 px-2 py-1 border border-black cursor-pointer hover:bg-purple-100 flex items-center" onClick={playClick}>
+                                        {props.friend ? 'CHANGE' : 'UPLOAD'}
                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => props.onFriendUpload(e.target.files![0])} />
                                     </label>
-                                ) : (
-                                    <label className="text-[10px] font-bold bg-purple-200 px-2 py-1 border border-black cursor-pointer hover:bg-purple-100" onClick={playClick}>UPLOAD
-                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => props.onFriendUpload(e.target.files![0])} />
-                                    </label>
-                                )}
+                                </div>
                             </div>
-                            {props.friend && <img src={`data:image/jpeg;base64,${props.friend.base64}`} className="w-10 h-10 object-cover border border-black mt-1" alt="Friend"/>}
+                            {props.friend && (
+                                <div className="flex flex-col gap-1 mt-1">
+                                    <div className="flex items-center gap-2">
+                                        <img src={`data:image/jpeg;base64,${props.friend.base64}`} className="w-10 h-10 object-cover border border-black" alt="Friend"/>
+                                        <button onClick={() => { playClick(); props.onAutoGenerateFriend(); }} className="text-[10px] underline text-gray-500 hover:text-black">Regenerate</button>
+                                    </div>
+                                    {props.friend.name && (
+                                        <div className="bg-white p-1 border border-gray-300">
+                                             <p className="font-comic text-xs font-bold">{props.friend.name}</p>
+                                             <p className="font-sans text-[8px] leading-tight text-gray-600 line-clamp-2">{props.friend.backstory}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                          {/* VILLAIN */}
@@ -169,9 +206,17 @@ export const Setup: React.FC<SetupProps> = (props) => {
                                 )}
                             </div>
                             {props.villain ? (
-                                <div className="flex items-center gap-2">
-                                    <img src={`data:image/jpeg;base64,${props.villain.base64}`} className="w-12 h-12 object-cover border border-black" alt="Villain"/>
-                                    <button onClick={() => { playClick(); props.onAutoGenerateVillain(); }} className="text-[10px] underline text-gray-500 hover:text-black">Regenerate</button>
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                        <img src={`data:image/jpeg;base64,${props.villain.base64}`} className="w-12 h-12 object-cover border border-black" alt="Villain"/>
+                                        <button onClick={() => { playClick(); props.onAutoGenerateVillain(); }} className="text-[10px] underline text-gray-500 hover:text-black">Regenerate</button>
+                                    </div>
+                                    {props.villain.name && (
+                                        <div className="bg-white p-1 border border-gray-300">
+                                             <p className="font-comic text-xs font-bold">{props.villain.name}</p>
+                                             <p className="font-sans text-[8px] leading-tight text-gray-600 line-clamp-2">{props.villain.backstory}</p>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <label className="text-[10px] text-center text-gray-400 cursor-pointer hover:text-black block w-full border border-gray-200 bg-white py-1">
@@ -180,6 +225,13 @@ export const Setup: React.FC<SetupProps> = (props) => {
                                 </label>
                             )}
                         </div>
+
+                        {/* GENERATE BIOS BUTTON */}
+                        <button onClick={() => { playClick(); props.onGenerateBios(); }} 
+                                className="comic-btn bg-white text-black text-sm px-4 py-2 hover:bg-gray-100 flex items-center justify-center gap-2 mt-auto"
+                                disabled={!props.hero}>
+                            <span>✨</span> GENERATE NAMES & BACKSTORIES
+                        </button>
                     </div>
 
                     {/* COL 3: SETTINGS */}

@@ -240,6 +240,14 @@ const App: React.FC = () => {
     }
   };
 
+  const handleGenerateBios = async () => {
+      const hasKey = await validateApiKey();
+      if (!hasKey) return;
+      soundManager.play('click');
+      await generateCharacterBios();
+      soundManager.play('success');
+  };
+
   const generateBeat = async (history: ComicFace[], isRightPage: boolean, pageNum: number, isDecisionPage: boolean): Promise<Beat> => {
     if (!heroRef.current) throw new Error("No Hero");
 
@@ -384,10 +392,17 @@ OUTPUT STRICT JSON ONLY:
       // Use selectedArtStyle instead of just genre for the character sheet
       try {
           const ai = getAI();
+          
+          let stylePrompt = `STYLE: Masterpiece ${selectedArtStyle} character sheet. `;
+          if (selectedArtStyle.includes('Pixel')) stylePrompt += "Pixel art style, sprite sheet. ";
+          else if (selectedArtStyle.includes('Painted')) stylePrompt += "Digital painting style. ";
+          else if (selectedArtStyle.includes('B&W') || selectedArtStyle.includes('Manga')) stylePrompt += "High contrast black and white ink. ";
+          else stylePrompt += "Detailed ink, neutral background. ";
+
           // Use retry wrapper
           const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
               model: MODEL_IMAGE_GEN_NAME,
-              contents: { parts: [{ text: `STYLE: Masterpiece ${selectedArtStyle} character sheet, detailed ink, neutral background. FULL BODY. Character: ${desc}` }] },
+              contents: { parts: [{ text: `${stylePrompt} FULL BODY. Character: ${desc}` }] },
               config: { imageConfig: { aspectRatio: '1:1' } }
           }));
           const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
@@ -415,7 +430,18 @@ OUTPUT STRICT JSON ONLY:
     }
 
     // Combine art style and genre for the prompt
-    let promptText = `STYLE: ${selectedArtStyle} comic book art. GENRE: ${selectedGenre}. Detailed ink, vibrant colors. `;
+    let promptText = `STYLE: ${selectedArtStyle} comic book art. GENRE: ${selectedGenre}. `;
+    
+    // Adjust keywords based on style
+    if (selectedArtStyle.includes('B&W') || selectedArtStyle.includes('Noir') || selectedArtStyle.includes('Manga')) {
+        promptText += "High contrast, monochrome, dramatic lighting, detailed ink. ";
+    } else if (selectedArtStyle.includes('Painted') || selectedArtStyle.includes('Watercolor')) {
+         promptText += "Rich textures, painterly, artistic. ";
+    } else if (selectedArtStyle.includes('Pixel')) {
+         promptText += "Retro digital art, pixelated, arcade style. ";
+    } else {
+         promptText += "Detailed ink, vibrant colors, cinematic lighting. ";
+    }
     
     if (type === 'cover') {
         const langName = LANGUAGES.find(l => l.code === selectedLanguage)?.name || "English";
@@ -588,6 +614,26 @@ OUTPUT STRICT JSON ONLY:
       }
   }
 
+  const handleAutoGenerateHero = async () => {
+    try {
+        soundManager.play('click');
+        const desc = `A heroic protagonist for a ${selectedGenre} story.`;
+        const p = await generatePersona(desc);
+        setHero(p);
+        soundManager.play('success');
+    } catch(e) { console.error(e); handleAPIError(e); }
+  }
+
+  const handleAutoGenerateFriend = async () => {
+    try {
+        soundManager.play('click');
+        const desc = `A loyal ally/sidekick for a ${selectedGenre} story.`;
+        const p = await generatePersona(desc);
+        setFriend(p);
+        soundManager.play('success');
+    } catch(e) { console.error(e); handleAPIError(e); }
+  }
+
   const handleAutoGenerateVillain = async () => {
       try {
           soundManager.play('click');
@@ -617,7 +663,11 @@ OUTPUT STRICT JSON ONLY:
     setStoryTone(availableTones[Math.floor(Math.random() * availableTones.length)]);
 
     // Start parallel tasks
-    const initBios = generateCharacterBios();
+    // If names are not present, generate bios. Otherwise, assume they are good.
+    let initBios = Promise.resolve();
+    if (!heroRef.current.name) {
+       initBios = generateCharacterBios();
+    }
 
     // Initial Batch
     const coverFace: ComicFace = { id: 'page-0', type: 'cover', choices: [], isLoading: true, pageIndex: 0 };
@@ -738,6 +788,9 @@ OUTPUT STRICT JSON ONLY:
           onFriendUpload={handleFriendUpload}
           onVillainUpload={handleVillainUpload}
           onAutoGenerateVillain={handleAutoGenerateVillain}
+          onAutoGenerateHero={handleAutoGenerateHero}
+          onAutoGenerateFriend={handleAutoGenerateFriend}
+          onGenerateBios={handleGenerateBios}
           onGenreChange={setSelectedGenre}
           onArtStyleChange={setSelectedArtStyle}
           onLanguageChange={setSelectedLanguage}

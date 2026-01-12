@@ -11,19 +11,24 @@ export const TOTAL_PAGES = 12; // 0 to 12 = 13 faces.
 export const INITIAL_PAGES = 2;
 export const GATE_PAGE = 2;
 export const BATCH_SIZE = 6;
-export const DECISION_PAGES = [3, 7]; // Added a second decision point for more drama
+export const DECISION_PAGES = [3, 5, 7, 9]; // Frequent decision points for a dynamic narrative
 
 export const GENRES = ["Classic Horror", "Superhero Action", "Dark Sci-Fi", "High Fantasy", "Neon Noir Detective", "Wasteland Apocalypse", "Lighthearted Comedy", "Teen Drama / Slice of Life", "Custom"];
 
 export const ART_STYLES = [
-    "Modern American",
-    "Silver Age (Vintage)",
-    "Manga (Black & White)",
+    "Modern American (Vibrant)",
+    "Silver Age (Vintage 1960s)",
+    "Golden Age (Vintage 1940s)",
+    "Manga (Standard B&W)",
+    "Manga (Retro 90s Anime)",
     "Franco-Belgian (Ligne Claire)",
-    "Noir (High Contrast)",
-    "Painted (Alex Ross style)",
-    "8-Bit Pixel Art",
-    "Watercolor"
+    "European (Moebius Sci-Fi)",
+    "Noir (High Contrast B&W)",
+    "Pulp Magazine (Rough)",
+    "Painted (Alex Ross Style)",
+    "Watercolor (Dreamy)",
+    "Paper Cutout (Collage)",
+    "8-Bit Pixel Art"
 ];
 
 export const TONES = [
