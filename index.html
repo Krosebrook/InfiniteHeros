@@ -5,6 +5,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gemini Dynamic Comics</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#DC2626" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="InfiniteHeroes" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1051/1051326.png" />
+    <link rel="manifest" href="manifest.json" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <!-- Bangers for titles, Comic Neue for text -->
@@ -261,6 +270,20 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          // Standard relative path is safer across origins in sandboxed environments
+          navigator.serviceWorker.register('service-worker.js')
+            .then(reg => console.log('Service Worker registered', reg))
+            .catch(err => {
+              // Silently fail if blocked by sandbox restrictions rather than crashing app
+              console.warn('Service Worker registration skipped or failed:', err);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
-        
