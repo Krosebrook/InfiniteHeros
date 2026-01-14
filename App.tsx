@@ -7,6 +7,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, GenerateContentResponse, Modality } from '@google/genai';
 import jsPDF from 'jspdf';
+import JSZip from 'jszip';
 import { MAX_STORY_PAGES, BACK_COVER_PAGE, TOTAL_PAGES, LETTERS_PAGE, INITIAL_PAGES, BATCH_SIZE, DECISION_PAGES, GENRES, ART_STYLES, TONES, LANGUAGES, ComicFace, Beat, Persona, LetterItem } from './types';
 import { Setup } from './Setup';
 import { Book } from './Book';
@@ -15,6 +16,7 @@ import { useApiKey } from './useApiKey';
 import { ApiKeyDialog } from './ApiKeyDialog';
 import { soundManager } from './SoundManager';
 import { saveGame, loadGame, clearSave } from './db';
+import { ExportDialog } from './ExportDialog';
 
 // --- Constants ---
 const MODEL_IMAGE_GEN_NAME = "gemini-3-pro-image-preview";
@@ -61,6 +63,8 @@ const App: React.FC = () => {
   const [richMode, setRichMode] = useState(true);
   const [hasSave, setHasSave] = useState(false);
   const [showBios, setShowBios] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   const heroRef = useRef<Persona | null>(null);
   const friendRef = useRef<Persona | null>(null);
@@ -168,7 +172,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleReadAloud = async (text: string) => {
+  const handleReadAloud = async (text: string, context?: string) => {
     const hasKey = await validateApiKey();
     if (!hasKey) return;
     
@@ -176,6 +180,12 @@ const App: React.FC = () => {
         const ai = getAI();
         soundManager.play('click');
         
+        let voiceName = 'Kore'; // Default balanced voice
+        if (context === 'villain') voiceName = 'Charon'; // Deeper
+        else if (context === 'hero') voiceName = 'Fenrir'; // Intense
+        else if (context === 'friend') voiceName = 'Puck'; // Energetic
+        else if (context === 'other') voiceName = 'Zephyr'; // Calm
+
         // Use Gemini TTS
         const response = await ai.models.generateContent({
             model: MODEL_TTS_NAME,
@@ -184,9 +194,7 @@ const App: React.FC = () => {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: {
                     voiceConfig: {
-                        // Use Kore as a neutral-ish narrator voice, or switch based on tone? 
-                        // For now hardcoded to a clear voice.
-                        prebuiltVoiceConfig: { voiceName: 'Kore' },
+                        prebuiltVoiceConfig: { voiceName },
                     },
                 },
             },
@@ -194,7 +202,7 @@ const App: React.FC = () => {
 
         const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
         if (audioData) {
-            soundManager.playTTS(audioData);
+            await soundManager.playTTS(audioData);
         }
 
     } catch (e) {
@@ -349,7 +357,21 @@ const App: React.FC = () => {
 
     // CONTINUITY LOGIC
     if (lastPage?.narrative?.dialogue) {
-         instruction += `\n\n*** DIALOGUE CONTINUITY ***\nPrevious line: "${lastPage.narrative.dialogue}".\nIf characters are conversing, ensure the new line directly responds to or logically follows the previous one. Maintain the rhythm of speech.`;
+         const lastSpeakerRole = lastPage.narrative.focus_char || 'unknown';
+         // Map role to name if possible for better context
+         let lastSpeakerName = 'Unknown';
+         if (lastSpeakerRole === 'hero') lastSpeakerName = heroRef.current?.name || 'Hero';
+         else if (lastSpeakerRole === 'friend') lastSpeakerName = friendRef.current?.name || 'Ally';
+         else if (lastSpeakerRole === 'villain') lastSpeakerName = villainRef.current?.name || 'Villain';
+
+         instruction += `\n\n*** DIALOGUE CONTINUITY ENFORCEMENT ***
+         PREVIOUS SPEAKER: ${lastSpeakerName} (${lastSpeakerRole.toUpperCase()})
+         PREVIOUS LINE: "${lastPage.narrative.dialogue}"
+         
+         REQUIREMENTS:
+         1. If the current speaker is NOT ${lastSpeakerName}, they must REACT directly to the previous line (e.g., answer a question, retort, interrupt, or agree).
+         2. If the current speaker IS ${lastSpeakerName}, they are continuing their thought or reacting to the environment.
+         3. Avoid non-sequiturs. The conversation must flow naturally.`;
     }
 
     if (isFinalPage) {
@@ -433,6 +455,9 @@ OUTPUT STRICT JSON ONLY:
           if (selectedArtStyle.includes('Pixel')) stylePrompt += "Pixel art style, sprite sheet. ";
           else if (selectedArtStyle.includes('Painted')) stylePrompt += "Digital painting style. ";
           else if (selectedArtStyle.includes('B&W') || selectedArtStyle.includes('Manga')) stylePrompt += "High contrast black and white ink. ";
+          else if (selectedArtStyle.includes('Claymation')) stylePrompt += "Stop-motion clay animation style, plasticine texture. ";
+          else if (selectedArtStyle.includes('Chalkboard')) stylePrompt += "White chalk on black slate, rough sketchy lines. ";
+          else if (selectedArtStyle.includes('Abstract')) stylePrompt += "Abstract forms, bold strokes, expressive. ";
           else stylePrompt += "Detailed ink, neutral background. ";
 
           // Use retry wrapper
@@ -475,6 +500,12 @@ OUTPUT STRICT JSON ONLY:
          promptText += "Rich textures, painterly, artistic. ";
     } else if (selectedArtStyle.includes('Pixel')) {
          promptText += "Retro digital art, pixelated, arcade style. ";
+    } else if (selectedArtStyle.includes('Claymation')) {
+         promptText += "Stop-motion clay animation style, plasticine texture, diorama lighting. ";
+    } else if (selectedArtStyle.includes('Chalkboard')) {
+         promptText += "White chalk on black slate background, rough sketchy lines. ";
+    } else if (selectedArtStyle.includes('Abstract')) {
+         promptText += "Abstract forms, bold strokes, expressive, non-representational elements. ";
     } else {
          promptText += "Detailed ink, vibrant colors, cinematic lighting. ";
     }
@@ -779,6 +810,55 @@ OUTPUT STRICT JSON ONLY:
     doc.save('Infinite-Heroes-Issue.pdf');
   };
 
+  const handleExportImages = async (format: 'png' | 'jpg', quality: number, scale: number) => {
+    soundManager.play('click');
+    setIsExporting(true);
+    try {
+        const zip = new JSZip();
+        const imagesFolder = zip.folder("comic_panels");
+
+        const pagesToExport = comicFaces.filter(face => face.imageUrl && !face.isLoading).sort((a, b) => (a.pageIndex || 0) - (b.pageIndex || 0));
+
+        for (const face of pagesToExport) {
+            // Use Canvas to handle resizing and format conversion
+            const img = new Image();
+            img.src = face.imageUrl!;
+            await new Promise(resolve => { img.onload = resolve; });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            if(ctx) {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, mime, quality));
+                
+                if (blob && imagesFolder) {
+                    const filename = `page_${face.pageIndex}.${format}`;
+                    imagesFolder.file(filename, blob);
+                }
+            }
+        }
+        
+        const zipBlob = await zip.generateAsync({type:"blob"});
+        const url = URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `infinite-heroes-panels.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        soundManager.play('success');
+
+    } catch (e) {
+        console.error("Export failed", e);
+        alert("Failed to export images.");
+    } finally {
+        setIsExporting(false);
+        setShowExportDialog(false);
+    }
+  };
+
   const handleHeroUpload = async (file: File) => {
        try { const base64 = await fileToBase64(file); setHero({ base64, desc: "The Main Hero" }); soundManager.play('pop'); } catch (e) { alert("Upload failed"); }
   };
@@ -852,9 +932,18 @@ OUTPUT STRICT JSON ONLY:
           onAnimate={handleAnimatePanel}
           onRegenerate={handleRegeneratePanel}
           onReadAloud={handleReadAloud}
+          onExportImages={() => setShowExportDialog(true)}
       />
       
       {showBios && <CharacterBios hero={hero} friend={friend} villain={villain} onClose={() => setShowBios(false)} />}
+      
+      {showExportDialog && (
+          <ExportDialog 
+              onClose={() => setShowExportDialog(false)} 
+              onExport={handleExportImages} 
+              isExporting={isExporting} 
+          />
+      )}
     </div>
   );
 };

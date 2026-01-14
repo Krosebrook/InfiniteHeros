@@ -28,7 +28,10 @@ export const ART_STYLES = [
     "Painted (Alex Ross Style)",
     "Watercolor (Dreamy)",
     "Paper Cutout (Collage)",
-    "8-Bit Pixel Art"
+    "8-Bit Pixel Art",
+    "Claymation",
+    "Abstract Expressionism",
+    "Chalkboard Sketch"
 ];
 
 export const TONES = [

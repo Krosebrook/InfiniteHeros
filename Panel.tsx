@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ComicFace, INITIAL_PAGES, GATE_PAGE } from './types';
 import { LoadingFX } from './LoadingFX';
 
@@ -17,10 +17,13 @@ interface PanelProps {
     onReset: () => void;
     onAnimate: (id: string) => void;
     onRegenerate: (id: string) => void;
-    onReadAloud: (text: string) => void;
+    onReadAloud: (text: string, context?: string) => Promise<void>;
+    onExportImages?: () => void;
 }
 
-export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBook, onDownload, onReset, onAnimate, onRegenerate, onReadAloud }) => {
+export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBook, onDownload, onReset, onAnimate, onRegenerate, onReadAloud, onExportImages }) => {
+    const [isReading, setIsReading] = useState(false);
+
     if (!face) return <div className="w-full h-full bg-gray-950" />;
     
     // Letters Page Rendering
@@ -56,13 +59,20 @@ export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBo
     
     const isFullBleed = face.type === 'cover' || face.type === 'back_cover';
 
-    const handleSpeak = (e: React.MouseEvent) => {
+    const handleSpeak = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (face.narrative) {
-            const text = `${face.narrative.caption ? `Caption. ${face.narrative.caption}. ` : ''} ${face.narrative.dialogue ? `Dialogue. ${face.narrative.dialogue}` : ''}`;
-            if (text.trim()) {
-                onReadAloud(text);
+        if (face.narrative && !isReading) {
+            setIsReading(true);
+            // Construct text without redundant "Caption." prefixes for a more natural read
+            const textParts = [];
+            if (face.narrative.caption) textParts.push(face.narrative.caption);
+            if (face.narrative.dialogue) textParts.push(face.narrative.dialogue);
+            
+            if (textParts.length > 0) {
+                const text = textParts.join('. ');
+                await onReadAloud(text, face.narrative.focus_char);
             }
+            setIsReading(false);
         }
     };
 
@@ -90,20 +100,27 @@ export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBo
                     {!face.videoUrl && (
                         <button onClick={(e) => { e.stopPropagation(); onAnimate(face.id); }} 
                                 className="bg-yellow-400 p-2 rounded-full border-2 border-black hover:bg-yellow-300 shadow-md transform hover:scale-110 transition-transform"
-                                title="Animate with Veo">
+                                title="Animate with Veo"
+                                aria-label="Animate Panel">
                             <span className="text-xl">🎥</span>
                         </button>
                     )}
+                    
+                    {/* Regenerate Button */}
                     <button onClick={(e) => { e.stopPropagation(); onRegenerate(face.id); }}
                             className="bg-white/90 p-2 rounded-full border-2 border-black hover:bg-blue-300 shadow-md transform hover:scale-110 transition-transform"
-                            title="Regenerate Image">
+                            title="Regenerate Image"
+                            aria-label="Regenerate Image">
                         <span className="text-xl">🔄</span>
                     </button>
+
                     {(face.narrative?.caption || face.narrative?.dialogue) && (
                          <button onClick={handleSpeak}
-                                 className="bg-white/90 p-2 rounded-full border-2 border-black hover:bg-purple-300 shadow-md transform hover:scale-110 transition-transform"
-                                 title="Read Aloud">
-                             <span className="text-xl">🔊</span>
+                                 disabled={isReading}
+                                 className={`bg-white/90 p-2 rounded-full border-2 border-black hover:bg-purple-300 shadow-md transform hover:scale-110 transition-transform ${isReading ? 'animate-pulse bg-purple-300' : ''}`}
+                                 title="Read Aloud"
+                                 aria-label="Read Aloud">
+                             <span className="text-xl">{isReading ? '⏳' : '🔊'}</span>
                          </button>
                     )}
                 </div>
@@ -136,7 +153,10 @@ export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBo
             {/* Back Cover Actions */}
             {face.type === 'back_cover' && (
                 <div className="absolute bottom-24 inset-x-0 flex flex-col items-center gap-4 z-20">
-                    <button onClick={(e) => { e.stopPropagation(); onDownload(); }} className="comic-btn bg-blue-500 text-white px-8 py-3 text-xl font-bold hover:scale-105">DOWNLOAD ISSUE</button>
+                    <button onClick={(e) => { e.stopPropagation(); onDownload(); }} className="comic-btn bg-blue-500 text-white px-8 py-3 text-xl font-bold hover:scale-105">DOWNLOAD PDF</button>
+                    {onExportImages && (
+                        <button onClick={(e) => { e.stopPropagation(); onExportImages(); }} className="comic-btn bg-yellow-400 text-black px-8 py-3 text-xl font-bold hover:scale-105">EXPORT IMAGES</button>
+                    )}
                     <button onClick={(e) => { e.stopPropagation(); onReset(); }} className="comic-btn bg-green-500 text-white px-8 py-4 text-2xl font-bold hover:scale-105">CREATE NEW ISSUE</button>
                 </div>
             )}
