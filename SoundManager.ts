@@ -11,13 +11,59 @@ class SoundManager {
 
     private init() {
         if (!this.ctx) {
-            this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         }
     }
 
     public toggleMute() {
         this.isMuted = !this.isMuted;
         return this.isMuted;
+    }
+
+    private base64ToArrayBuffer(base64: string): ArrayBuffer {
+        const binaryString = window.atob(base64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+
+    public async playTTS(base64Data: string) {
+        if (this.isMuted) return;
+        this.init();
+        if (!this.ctx) return;
+        
+        if (this.ctx.state === 'suspended') {
+            await this.ctx.resume();
+        }
+
+        try {
+            const arrayBuffer = this.base64ToArrayBuffer(base64Data);
+            const dataInt16 = new Int16Array(arrayBuffer);
+            const numChannels = 1;
+            const sampleRate = 24000;
+            
+            // Convert Int16 PCM to Float32 for Web Audio API
+            const frameCount = dataInt16.length / numChannels;
+            const audioBuffer = this.ctx.createBuffer(numChannels, frameCount, sampleRate);
+            
+            for (let channel = 0; channel < numChannels; channel++) {
+                const channelData = audioBuffer.getChannelData(channel);
+                for (let i = 0; i < frameCount; i++) {
+                    // Convert 16-bit integer to float range [-1.0, 1.0]
+                    channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+                }
+            }
+
+            const source = this.ctx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(this.ctx.destination);
+            source.start();
+        } catch (e) {
+            console.error("Error playing TTS", e);
+        }
     }
 
     public play(type: 'click' | 'flip' | 'pop' | 'success') {

@@ -17,9 +17,10 @@ interface PanelProps {
     onReset: () => void;
     onAnimate: (id: string) => void;
     onRegenerate: (id: string) => void;
+    onReadAloud: (text: string) => void;
 }
 
-export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBook, onDownload, onReset, onAnimate, onRegenerate }) => {
+export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBook, onDownload, onReset, onAnimate, onRegenerate, onReadAloud }) => {
     if (!face) return <div className="w-full h-full bg-gray-950" />;
     
     // Letters Page Rendering
@@ -55,6 +56,16 @@ export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBo
     
     const isFullBleed = face.type === 'cover' || face.type === 'back_cover';
 
+    const handleSpeak = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (face.narrative) {
+            const text = `${face.narrative.caption ? `Caption. ${face.narrative.caption}. ` : ''} ${face.narrative.dialogue ? `Dialogue. ${face.narrative.dialogue}` : ''}`;
+            if (text.trim()) {
+                onReadAloud(text);
+            }
+        }
+    };
+
     return (
         <div className={`panel-container relative group ${isFullBleed ? '!p-0 !bg-[#0a0a0a]' : ''}`}>
             <div className="gloss"></div>
@@ -78,9 +89,9 @@ export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBo
                 <div className="absolute top-2 right-2 flex flex-col gap-2 z-40 transition-opacity duration-300 opacity-100 md:opacity-0 md:group-hover:opacity-100">
                     {!face.videoUrl && (
                         <button onClick={(e) => { e.stopPropagation(); onAnimate(face.id); }} 
-                                className="bg-white/90 p-2 rounded-full border-2 border-black hover:bg-yellow-300 shadow-md transform hover:scale-110 transition-transform"
+                                className="bg-yellow-400 p-2 rounded-full border-2 border-black hover:bg-yellow-300 shadow-md transform hover:scale-110 transition-transform"
                                 title="Animate with Veo">
-                            <span className="text-xl">🎬</span>
+                            <span className="text-xl">🎥</span>
                         </button>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); onRegenerate(face.id); }}
@@ -88,6 +99,13 @@ export const Panel: React.FC<PanelProps> = ({ face, allFaces, onChoice, onOpenBo
                             title="Regenerate Image">
                         <span className="text-xl">🔄</span>
                     </button>
+                    {(face.narrative?.caption || face.narrative?.dialogue) && (
+                         <button onClick={handleSpeak}
+                                 className="bg-white/90 p-2 rounded-full border-2 border-black hover:bg-purple-300 shadow-md transform hover:scale-110 transition-transform"
+                                 title="Read Aloud">
+                             <span className="text-xl">🔊</span>
+                         </button>
+                    )}
                 </div>
             )}
             

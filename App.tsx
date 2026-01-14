@@ -5,7 +5,7 @@
 */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
+import { GoogleGenAI, GenerateContentResponse, Modality } from '@google/genai';
 import jsPDF from 'jspdf';
 import { MAX_STORY_PAGES, BACK_COVER_PAGE, TOTAL_PAGES, LETTERS_PAGE, INITIAL_PAGES, BATCH_SIZE, DECISION_PAGES, GENRES, ART_STYLES, TONES, LANGUAGES, ComicFace, Beat, Persona, LetterItem } from './types';
 import { Setup } from './Setup';
@@ -19,6 +19,7 @@ import { saveGame, loadGame, clearSave } from './db';
 // --- Constants ---
 const MODEL_IMAGE_GEN_NAME = "gemini-3-pro-image-preview";
 const MODEL_TEXT_NAME = "gemini-3-pro-preview";
+const MODEL_TTS_NAME = "gemini-2.5-flash-preview-tts";
 const MODEL_VEO = 'veo-3.1-fast-generate-preview';
 
 // --- Utility: Retry Logic ---
@@ -167,6 +168,41 @@ const App: React.FC = () => {
     });
   };
 
+  const handleReadAloud = async (text: string) => {
+    const hasKey = await validateApiKey();
+    if (!hasKey) return;
+    
+    try {
+        const ai = getAI();
+        soundManager.play('click');
+        
+        // Use Gemini TTS
+        const response = await ai.models.generateContent({
+            model: MODEL_TTS_NAME,
+            contents: [{ parts: [{ text }] }],
+            config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                    voiceConfig: {
+                        // Use Kore as a neutral-ish narrator voice, or switch based on tone? 
+                        // For now hardcoded to a clear voice.
+                        prebuiltVoiceConfig: { voiceName: 'Kore' },
+                    },
+                },
+            },
+        });
+
+        const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (audioData) {
+            soundManager.playTTS(audioData);
+        }
+
+    } catch (e) {
+        console.error("TTS Error", e);
+        handleAPIError(e);
+    }
+  };
+
   const generateLetters = async (history: ComicFace[]): Promise<LetterItem[]> => {
       const langName = LANGUAGES.find(l => l.code === selectedLanguage)?.name || "English";
       const summary = history.filter(h => h.narrative).map(h => `Page ${h.pageIndex}: ${h.narrative?.caption} (Choice made: ${h.resolvedChoice})`).join('\n');
@@ -204,7 +240,7 @@ const App: React.FC = () => {
     const prompt = `
       GENRE: ${selectedGenre}. TONE: ${storyTone}.
       
-      Generate brief character profiles (Name and 2-sentence backstory) for:
+      Generate DETAILED character dossiers (Name and 3-4 sentence rich backstory including motivation, personality quirks, and key abilities) for:
       1. HERO (The Protagonist)
       ${friendRef.current ? '2. CO-STAR ( The Ally)' : ''}
       ${villainRef.current ? '3. VILLAIN (The Antagonist)' : ''}
@@ -513,9 +549,9 @@ OUTPUT STRICT JSON ONLY:
           const ai = getAI();
           const base64Data = face.imageUrl.split(',')[1];
           
-          let veoprompt = `Cinematic subtle motion, 4k, ${face.narrative?.scene || 'comic book scene'}`;
+          let veoprompt = `Motion comic style, parallax breathing, slight movement, 4k, ${face.narrative?.scene || 'comic book scene'}`;
           if (face.type === 'cover') {
-              veoprompt = "Cinematic slow motion, epic comic book cover, dramatic lighting, 4k";
+              veoprompt = "Cinematic motion comic cover, epic lighting, slow zoom, 4k, dramatic";
           }
 
           // Retry Veo launch
@@ -815,6 +851,7 @@ OUTPUT STRICT JSON ONLY:
           onReset={resetApp}
           onAnimate={handleAnimatePanel}
           onRegenerate={handleRegeneratePanel}
+          onReadAloud={handleReadAloud}
       />
       
       {showBios && <CharacterBios hero={hero} friend={friend} villain={villain} onClose={() => setShowBios(false)} />}
