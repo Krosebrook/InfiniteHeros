@@ -7,11 +7,11 @@
 export const MAX_STORY_PAGES = 10;
 export const LETTERS_PAGE = 11;
 export const BACK_COVER_PAGE = 12;
-export const TOTAL_PAGES = 12; // 0 to 12 = 13 faces.
+export const TOTAL_PAGES = 12; 
 export const INITIAL_PAGES = 2;
 export const GATE_PAGE = 2;
 export const BATCH_SIZE = 6;
-export const DECISION_PAGES = [3, 5, 7, 9]; // Frequent decision points for a dynamic narrative
+export const DECISION_PAGES = [3, 5, 7, 9];
 
 export const GENRES = ["Classic Horror", "Superhero Action", "Dark Sci-Fi", "High Fantasy", "Neon Noir Detective", "Wasteland Apocalypse", "Lighthearted Comedy", "Teen Drama / Slice of Life", "Custom"];
 
@@ -35,45 +35,61 @@ export const ART_STYLES = [
 ];
 
 export const TONES = [
-    "ACTION-HEAVY (Short, punchy dialogue. Focus on kinetics.)",
-    "INNER-MONOLOGUE (Heavy captions revealing thoughts.)",
-    "QUIPPY (Characters use humor as a defense mechanism.)",
-    "OPERATIC (Grand, dramatic declarations and high stakes.)",
-    "CASUAL (Natural dialogue, focus on relationships/gossip.)",
-    "WHOLESOME (Warm, gentle, optimistic.)"
+    "ACTION-HEAVY",
+    "INNER-MONOLOGUE",
+    "QUIPPY",
+    "OPERATIC",
+    "CASUAL",
+    "WHOLESOME"
 ];
 
 export const LANGUAGES = [
     { code: 'en-US', name: 'English (US)' },
-    { code: 'ar-EG', name: 'Arabic (Egypt)' },
-    { code: 'de-DE', name: 'German (Germany)' },
     { code: 'es-MX', name: 'Spanish (Mexico)' },
-    { code: 'fr-FR', name: 'French (France)' },
-    { code: 'hi-IN', name: 'Hindi (India)' },
-    { code: 'id-ID', name: 'Indonesian (Indonesia)' },
-    { code: 'it-IT', name: 'Italian (Italy)' },
     { code: 'ja-JP', name: 'Japanese (Japan)' },
-    { code: 'ko-KR', name: 'Korean (South Korea)' },
+    { code: 'fr-FR', name: 'French (France)' },
+    { code: 'de-DE', name: 'German (Germany)' },
     { code: 'pt-BR', name: 'Portuguese (Brazil)' },
+    { code: 'zh-CN', name: 'Chinese (China)' },
+    { code: 'it-IT', name: 'Italian (Italy)' },
     { code: 'ru-RU', name: 'Russian (Russia)' },
-    { code: 'ua-UA', name: 'Ukrainian (Ukraine)' },
-    { code: 'vi-VN', name: 'Vietnamese (Vietnam)' },
-    { code: 'zh-CN', name: 'Chinese (China)' }
+    { code: 'ko-KR', name: 'Korean (South Korea)' },
+    { code: 'hi-IN', name: 'Hindi (India)' },
+    { code: 'ar-EG', name: 'Arabic (Egypt)' }
 ];
+
+export interface WorldState {
+    inventory: string[];
+    status: string[]; // e.g., "Injured Leg", "Cursed"
+    location_tags: string[];
+}
+
+export interface Bubble {
+    id: string;
+    text: string;
+    type: 'speech' | 'thought' | 'caption' | 'sfx';
+    character?: string;
+    x: number; // Percent 0-100
+    y: number; // Percent 0-100
+}
 
 export interface ComicFace {
   id: string;
   type: 'cover' | 'story' | 'letters' | 'back_cover';
   imageUrl?: string;
-  videoUrl?: string; // New: For Veo motion comics
+  videoUrl?: string;
   narrative?: Beat;
   choices: string[];
   resolvedChoice?: string;
   isLoading: boolean;
-  isAnimating?: boolean; // New: Loading state for video gen
+  isAnimating?: boolean;
   pageIndex?: number;
   isDecisionPage?: boolean;
   lettersContent?: LetterItem[];
+  bubbles?: Bubble[]; 
+  // Graph Fields
+  parentId?: string;
+  choiceLabel?: string; // The choice that led to this node from parent
 }
 
 export interface LetterItem {
@@ -84,11 +100,16 @@ export interface LetterItem {
 }
 
 export interface Beat {
-  caption?: string;
-  dialogue?: string;
   scene: string;
   choices: string[];
   focus_char: 'hero' | 'friend' | 'villain' | 'other';
+  bubbles: Bubble[]; 
+  world_update?: {
+      add_items?: string[];
+      remove_items?: string[];
+      add_status?: string[];
+      remove_status?: string[];
+  };
 }
 
 export interface Persona {
@@ -98,11 +119,18 @@ export interface Persona {
   backstory?: string;
 }
 
+export interface TTSSettings {
+    autoPlay: boolean;
+    defaultVoice: string; // Used for 'other' or narrator
+    playbackSpeed: number; // 0.5 to 2.0
+}
+
 export interface GameState {
   hero: Persona | null;
   friend: Persona | null;
   villain: Persona | null;
   comicFaces: ComicFace[];
+  storyTree?: Record<string, ComicFace>; // Full history
   currentSheetIndex: number;
   isStarted: boolean;
   selectedGenre: string;
@@ -110,4 +138,6 @@ export interface GameState {
   selectedLanguage: string;
   storyTone: string;
   timestamp: number;
+  worldState: WorldState;
+  ttsSettings?: TTSSettings;
 }

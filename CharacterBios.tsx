@@ -13,12 +13,18 @@ interface CharacterBiosProps {
     friend: Persona | null;
     villain: Persona | null;
     onClose: () => void;
+    onTalkToCharacter: (persona: Persona, role: string) => void;
 }
 
-export const CharacterBios: React.FC<CharacterBiosProps> = ({ hero, friend, villain, onClose }) => {
+export const CharacterBios: React.FC<CharacterBiosProps> = ({ hero, friend, villain, onClose, onTalkToCharacter }) => {
     const handleClose = () => {
         soundManager.play('click');
         onClose();
+    };
+
+    const handleTalk = (p: Persona, role: string) => {
+        soundManager.play('pop');
+        onTalkToCharacter(p, role);
     };
 
     // Helper to render a card
@@ -34,6 +40,12 @@ export const CharacterBios: React.FC<CharacterBiosProps> = ({ hero, friend, vill
             <div className="h-64 overflow-hidden border-b-4 border-black bg-gray-200 relative group">
                 <img src={`data:image/jpeg;base64,${p.base64}`} alt={role} className="w-full h-full object-cover object-top" />
                 <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                <button 
+                    onClick={() => handleTalk(p, role)}
+                    className="absolute bottom-4 right-4 bg-yellow-400 border-2 border-black px-4 py-2 font-comic text-lg hover:scale-110 shadow-lg active:scale-90 transition-transform"
+                >
+                    💬 TALK
+                </button>
             </div>
 
             {/* Info */}

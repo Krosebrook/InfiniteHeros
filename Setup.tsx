@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React, { useState, useEffect } from 'react';
-import { GENRES, ART_STYLES, LANGUAGES, Persona } from './types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { GENRES, ART_STYLES, LANGUAGES, TONES, Persona } from './types';
 import { soundManager } from './SoundManager';
 
 interface SetupProps {
@@ -17,6 +17,7 @@ interface SetupProps {
     selectedGenre: string;
     selectedArtStyle: string;
     selectedLanguage: string;
+    selectedTone: string;
     customPremise: string;
     richMode: boolean;
     hasSave?: boolean;
@@ -31,10 +32,24 @@ interface SetupProps {
     onGenreChange: (val: string) => void;
     onArtStyleChange: (val: string) => void;
     onLanguageChange: (val: string) => void;
+    onToneChange: (val: string) => void;
     onPremiseChange: (val: string) => void;
     onRichModeChange: (val: boolean) => void;
     onLaunch: () => void;
 }
+
+// Map genres to recommended art styles for a more curated experience
+const GENRE_STYLE_MAP: Record<string, string[]> = {
+    "Classic Horror": ["Noir (High Contrast B&W)", "Painted (Alex Ross Style)", "Watercolor (Dreamy)", "Golden Age (Vintage 1940s)"],
+    "Superhero Action": ["Modern American (Vibrant)", "Silver Age (Vintage 1960s)", "Painted (Alex Ross Style)"],
+    "Dark Sci-Fi": ["European (Moebius Sci-Fi)", "Noir (High Contrast B&W)", "8-Bit Pixel Art", "Manga (Retro 90s Anime)"],
+    "High Fantasy": ["Watercolor (Dreamy)", "Painted (Alex Ross Style)", "European (Moebius Sci-Fi)", "Franco-Belgian (Ligne Claire)"],
+    "Neon Noir Detective": ["Noir (High Contrast B&W)", "Modern American (Vibrant)", "European (Moebius Sci-Fi)"],
+    "Wasteland Apocalypse": ["Pulp Magazine (Rough)", "Noir (High Contrast B&W)", "Modern American (Vibrant)"],
+    "Lighthearted Comedy": ["Franco-Belgian (Ligne Claire)", "Chalkboard Sketch", "Manga (Standard B&W)", "Paper Cutout (Collage)"],
+    "Teen Drama / Slice of Life": ["Manga (Standard B&W)", "Watercolor (Dreamy)", "Franco-Belgian (Ligne Claire)"],
+    "Custom": ART_STYLES
+};
 
 const Footer = () => {
   const [remixIndex, setRemixIndex] = useState(0);
@@ -68,6 +83,18 @@ const Footer = () => {
 };
 
 export const Setup: React.FC<SetupProps> = (props) => {
+    // Filter art styles based on selected genre
+    const filteredStyles = useMemo(() => {
+        return GENRE_STYLE_MAP[props.selectedGenre] || ART_STYLES;
+    }, [props.selectedGenre]);
+
+    // Update art style if current one isn't in filtered list
+    useEffect(() => {
+        if (filteredStyles.length > 0 && !filteredStyles.includes(props.selectedArtStyle)) {
+            props.onArtStyleChange(filteredStyles[0]);
+        }
+    }, [props.selectedGenre, filteredStyles]);
+
     if (!props.show && !props.isTransitioning) return null;
 
     const playClick = () => soundManager.play('click');
@@ -103,7 +130,6 @@ export const Setup: React.FC<SetupProps> = (props) => {
                  pointerEvents: props.isTransitioning ? 'none' : 'auto'
              }}>
           <div className="min-h-full flex items-center justify-center p-4 pb-20">
-            {/* Wider Container for 3 cols */}
             <div className="max-w-[1100px] w-full bg-white p-4 md:p-6 rotate-1 border-[6px] border-black shadow-[12px_12px_0px_rgba(0,0,0,0.6)] text-center relative">
                 
                 <h1 className="font-comic text-5xl md:text-6xl text-red-600 leading-none mb-1 tracking-wide inline-block mr-3" style={{textShadow: '3px 3px 0px black'}}>INFINITE</h1>
@@ -161,7 +187,6 @@ export const Setup: React.FC<SetupProps> = (props) => {
                     <div className="flex flex-col gap-3">
                         <div className="font-comic text-xl text-black border-b-4 border-black mb-1">2. THE CAST</div>
                         
-                        {/* CO-STAR */}
                         <div className={`p-2 border-2 border-dashed ${props.friend ? 'border-green-500 bg-green-50' : 'border-purple-300 bg-purple-50'}`}>
                             <div className="flex justify-between items-center">
                                 <p className="font-comic text-sm uppercase font-bold text-purple-900">CO-STAR (OPTIONAL)</p>
@@ -193,7 +218,6 @@ export const Setup: React.FC<SetupProps> = (props) => {
                             )}
                         </div>
 
-                         {/* VILLAIN */}
                          <div className={`p-2 border-2 border-dashed ${props.villain ? 'border-red-500 bg-red-50' : 'border-gray-400 bg-gray-50'} flex flex-col gap-1`}>
                             <div className="flex justify-between items-center">
                                 <p className="font-comic text-sm uppercase font-bold text-red-900">THE VILLAIN</p>
@@ -226,7 +250,6 @@ export const Setup: React.FC<SetupProps> = (props) => {
                             )}
                         </div>
 
-                        {/* GENERATE BIOS BUTTON */}
                         <button onClick={() => { playClick(); props.onGenerateBios(); }} 
                                 className="comic-btn bg-white text-black text-sm px-4 py-2 hover:bg-gray-100 flex items-center justify-center gap-2 mt-auto"
                                 disabled={!props.hero}>
@@ -247,9 +270,9 @@ export const Setup: React.FC<SetupProps> = (props) => {
                             </div>
 
                             <div>
-                                <p className="font-comic text-sm mb-1 font-bold text-gray-800">ART STYLE</p>
+                                <p className="font-comic text-sm mb-1 font-bold text-gray-800">ART STYLE (Filtered by Genre)</p>
                                 <select value={props.selectedArtStyle} onChange={(e) => { playClick(); props.onArtStyleChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm">
-                                    {ART_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    {filteredStyles.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
                             </div>
 
@@ -257,6 +280,13 @@ export const Setup: React.FC<SetupProps> = (props) => {
                                 <p className="font-comic text-sm mb-1 font-bold text-gray-800">LANGUAGE</p>
                                 <select value={props.selectedLanguage} onChange={(e) => { playClick(); props.onLanguageChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm">
                                     {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
+                                </select>
+                            </div>
+
+                            <div>
+                                <p className="font-comic text-sm mb-1 font-bold text-gray-800">STORY TONE</p>
+                                <select value={props.selectedTone} onChange={(e) => { playClick(); props.onToneChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm">
+                                    {TONES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
                             </div>
 

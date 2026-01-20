@@ -30,7 +30,7 @@ class SoundManager {
         return bytes.buffer;
     }
 
-    public async playTTS(base64Data: string) {
+    public async playTTS(base64Data: string, speed: number = 1.0) {
         if (this.isMuted) return;
         this.init();
         if (!this.ctx) return;
@@ -59,6 +59,7 @@ class SoundManager {
 
             const source = this.ctx.createBufferSource();
             source.buffer = audioBuffer;
+            source.playbackRate.value = speed; 
             source.connect(this.ctx.destination);
             source.start();
         } catch (e) {
@@ -66,7 +67,7 @@ class SoundManager {
         }
     }
 
-    public play(type: 'click' | 'flip' | 'pop' | 'success') {
+    public play(type: 'click' | 'flip' | 'pop' | 'success' | 'scribble' | 'swoosh' | 'magic') {
         if (this.isMuted) return;
         this.init();
         if (!this.ctx) return;
@@ -132,6 +133,75 @@ class SoundManager {
             gain.gain.linearRampToValueAtTime(0, t + 0.6);
             osc.start(t);
             osc.stop(t + 0.6);
+        }
+        else if (type === 'scribble') {
+            // High frequency scratch sound
+            const bufferSize = this.ctx.sampleRate * 0.15;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+            
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(4000, t);
+            filter.Q.setValueAtTime(5, t);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            
+            gain.gain.setValueAtTime(0.05, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+            noise.start(t);
+        }
+        else if (type === 'swoosh') {
+            // Filtered noise sweep for motion
+            const bufferSize = this.ctx.sampleRate * 0.5;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.Q.value = 1;
+            filter.frequency.setValueAtTime(200, t);
+            filter.frequency.exponentialRampToValueAtTime(3000, t + 0.2);
+
+            noise.connect(filter);
+            filter.connect(gain);
+
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.15, t + 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+            
+            noise.start(t);
+        }
+        else if (type === 'magic') {
+            // Sparkly chord for AI generation
+            const freqs = [523.25, 659.25, 783.99, 1046.50]; // C Major 7
+            freqs.forEach((f, i) => {
+                const o = this.ctx!.createOscillator();
+                const g = this.ctx!.createGain();
+                o.type = 'sine';
+                o.frequency.value = f;
+                o.connect(g);
+                g.connect(this.ctx!.destination);
+                
+                const start = t + (i * 0.05);
+                g.gain.setValueAtTime(0, start);
+                g.gain.linearRampToValueAtTime(0.05, start + 0.05);
+                g.gain.exponentialRampToValueAtTime(0.001, start + 0.8);
+                
+                o.start(start);
+                o.stop(start + 1);
+            });
         }
     }
 }
