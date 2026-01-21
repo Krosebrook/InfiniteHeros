@@ -163,7 +163,7 @@ export const Book: React.FC<BookProps> = (props) => {
               transition={{ 
                 type: "spring", 
                 stiffness: 40, 
-                damping: 15,
+                damping: 15, 
                 mass: 1.2 
               }}
             >

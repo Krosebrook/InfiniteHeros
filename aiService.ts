@@ -121,7 +121,28 @@ export const generateLetters = async (history: ComicFace[], langName: string): P
 };
 
 export const generateCharacterBios = async (genre: string, tone: string, langName: string, hasFriend: boolean, hasVillain: boolean) => {
-    const prompt = `GENRE: ${genre}. TONE: ${tone}. Generate JSON dossiers for Hero${hasFriend ? ', Friend' : ''}${hasVillain ? ', Villain' : ''} in ${langName}. Focus on dramatic motivations and unique character quirks that fit the ${genre} setting.`;
+    const prompt = `
+    GENRE: ${genre}. 
+    TONE: ${tone}. 
+    LANGUAGE: ${langName}.
+    
+    INSTRUCTIONS:
+    Generate detailed JSON dossiers for the following characters:
+    1. Hero (Required)
+    ${hasFriend ? '2. Friend/Sidekick (Required)' : ''}
+    ${hasVillain ? '3. Villain/Antagonist (Required)' : ''}
+    
+    For each character, provide:
+    - 'name': A creative, genre-appropriate name.
+    - 'backstory': A detailed biography (approx 50-80 words) focusing on their dramatic motivations, secrets, and unique quirks that fit the ${genre} setting.
+
+    RETURN JSON FORMAT:
+    {
+      "hero": { "name": "...", "backstory": "..." },
+      "friend": { "name": "...", "backstory": "..." }, // Optional if not requested
+      "villain": { "name": "...", "backstory": "..." } // Optional if not requested
+    }
+    `;
     const ai = getAI();
     const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({ 
         model: MODEL_TEXT_NAME, contents: prompt, config: { responseMimeType: 'application/json' } 
@@ -162,13 +183,14 @@ export const generateBeat = async (
         if (villain.backstory) charInfo += ` (Persona: ${villain.backstory})`;
     }
 
+    // Increased context window to 5 panels
     const recentPanels = history
         .filter(p => p.type === 'story' && p.bubbles && p.bubbles.length > 0)
-        .slice(-3);
+        .slice(-5);
         
     let dialogueHistory = "";
     if (recentPanels.length > 0) {
-        dialogueHistory = "\nRECENT CONVERSATION HISTORY:\n";
+        dialogueHistory = "\nRECENT CONVERSATION HISTORY (Last 5 Panels):\n";
         recentPanels.forEach(p => {
              dialogueHistory += `[Page ${p.pageIndex}]\n`;
              p.bubbles?.forEach(b => {
@@ -199,10 +221,12 @@ USER DECISION: "${recentChoice || 'N/A'}"
 
 INSTRUCTIONS:
 1. Advance the plot logically based on the USER DECISION.
-2. Maintain STRICT DIALOGUE CONTINUITY. New speech bubbles must feel like a direct response to the RECENT CONVERSATION HISTORY.
+2. Maintain STRICT DIALOGUE CONTINUITY. New speech bubbles must feel like a direct response to the RECENT CONVERSATION HISTORY. Consider the flow across the last 5 panels.
 3. Update WORLD STATE if the hero finds an item or gets injured.
 4. Ensure character voices are distinct and consistent with their personas.
-5. SCENE DESCRIPTION must be a VISUAL-ONLY description for an artist. CLEAN ART, NO TEXT.
+5. Generate DIALOGUE BUBBLES separated from the art description.
+   **CRITICAL: SCENE DESCRIPTION must be VISUAL only. DO NOT include any text, speech bubbles, letters, or words within the image description itself.**
+   **The image must be CLEAN and TEXT-FREE. All dialogue will be overlayed separately.**
 
 RETURN JSON:
 {
@@ -253,7 +277,8 @@ User Instruction: "${instruction}"
 Task: Rewrite the 'scene', 'bubbles', and 'choices' (if applicable) based on the instruction while keeping the overall story arc consistent.
 Keep the JSON structure exactly the same.
 Ensure 'scene' is a visual description.
-**CRITICAL: The scene must remain TEXT-FREE.**
+Ensure 'bubbles' has 'id', 'text', 'type', 'x', 'y'.
+**CRITICAL: The scene must remain TEXT-FREE and CLEAN of any words or baked-in bubbles.**
 
 RETURN JSON ONLY.
 `;
@@ -313,7 +338,7 @@ export const generateImage = async (
     if (type === 'cover') {
         promptText += ` HIGH-END COMIC COVER ART. Dynamic cinematic lighting, epic composition. CLEAN ART. NO TEXT, NO SPEECH BUBBLES.`;
     } else {
-        promptText += ` SCENE: ${beat.scene}. **MANDATORY: CLEAN TEXT-FREE ART. NO DIALOGUE, NO BUBBLES.**`;
+        promptText += ` SCENE: ${beat.scene}. **MANDATORY: NO TEXT, NO SPEECH BUBBLES, NO WORDS, NO LETTERS.** ONLY THE VISUAL ACTION.`;
     }
 
     parts.push({ text: promptText });
@@ -336,7 +361,7 @@ export const editImage = async (
     const ai = getAI();
     const parts = [
         { inlineData: { mimeType: 'image/jpeg', data: originalBase64 } },
-        { text: `${instruction}. Preserve character consistency. NO TEXT.` }
+        { text: `${instruction}. MAINTAIN TEXT-FREE CLEAN ART. NO SPEECH BUBBLES.` }
     ];
 
     const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({

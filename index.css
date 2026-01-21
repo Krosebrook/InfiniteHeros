@@ -51,33 +51,14 @@
 /* Thought Bubble */
 .comic-bubble-thought {
     background: white;
-    border: 2px solid #666;
-    border-radius: 40%;
+    border: 3px solid #666;
+    border-radius: 50%;
     box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
     opacity: 0.95;
     position: relative;
-}
-
-.comic-bubble-thought::after, .comic-bubble-thought::before {
-    content: '';
-    position: absolute;
-    background: white;
-    border: 2px solid #666;
-    border-radius: 50%;
-}
-
-.comic-bubble-thought::after {
-    width: 12px;
-    height: 12px;
-    bottom: -15px;
-    left: 20%;
-}
-
-.comic-bubble-thought::before {
-    width: 8px;
-    height: 8px;
-    bottom: -25px;
-    left: 10%;
+    border-style: solid;
+    /* Use dashes for cloud effect */
+    border-style: dashed;
 }
 
 /* Caption */
@@ -97,16 +78,21 @@
 
 /* SFX */
 .comic-bubble-sfx {
-    background: transparent;
+    background: #e53935;
     border: none;
+    /* Jagged edges via clip-path */
+    clip-path: polygon(
+        20% 0%, 40% 15%, 50% 0%, 65% 15%, 80% 0%, 90% 20%, 100% 10%, 95% 40%, 100% 50%, 90% 60%, 100% 80%, 80% 85%, 60% 100%, 40% 85%, 20% 100%, 10% 80%, 0% 60%, 10% 50%, 0% 40%, 10% 20%
+    );
+    padding: 20px;
 }
 
 .comic-bubble-sfx .bubble-content {
     font-family: 'Bangers', cursive;
-    color: #e53935; /* Bold Red */
-    font-size: 48px;
-    text-shadow: 3px 3px 0 white, -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
-    transform: rotate(-10deg);
+    color: white; /* White text on red burst */
+    font-size: 28px;
+    text-shadow: 2px 2px 0 black;
+    transform: rotate(-5deg);
     text-transform: uppercase;
     font-weight: 900;
 }

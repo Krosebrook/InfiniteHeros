@@ -39,6 +39,7 @@ export const Panel: React.FC<PanelProps> = ({
     const handleDragStart = (e: React.DragEvent, id: string) => {
         setDraggedBubble(id);
         e.dataTransfer.effectAllowed = "move";
+        // Create a ghost image so the browser default drag image doesn't obscure vision
         const img = new Image();
         img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; 
         e.dataTransfer.setDragImage(img, 0, 0);
@@ -53,6 +54,7 @@ export const Panel: React.FC<PanelProps> = ({
         if (!draggedBubble || !face || !face.bubbles || !onBubbleUpdate) return;
 
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        // Calculate percentage position relative to the container
         const x = ((e.clientX - rect.left) / rect.width) * 100;
         const y = ((e.clientY - rect.top) / rect.height) * 100;
 
@@ -115,6 +117,19 @@ export const Panel: React.FC<PanelProps> = ({
             onReviseScript(face.id, scriptPrompt);
             setIsRevisingScript(false);
             setScriptPrompt("");
+        }
+    };
+
+    const handleDownloadPanel = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (face && face.imageUrl) {
+             const link = document.createElement('a');
+             link.href = face.imageUrl;
+             link.download = `comic-panel-${face.pageIndex || 'cover'}.png`;
+             document.body.appendChild(link);
+             link.click();
+             document.body.removeChild(link);
+             if (onDownload) onDownload(); 
         }
     };
 
@@ -185,7 +200,7 @@ export const Panel: React.FC<PanelProps> = ({
             )}
 
             {/* Render Dynamic HTML Bubbles */}
-            <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
+            <div className="absolute inset-0 z-20 overflow-hidden">
                 <AnimatePresence>
                 {face.bubbles?.map((b, i) => (
                     <motion.div
@@ -202,7 +217,7 @@ export const Panel: React.FC<PanelProps> = ({
                         draggable
                         onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, b.id)}
                         onDoubleClick={(e) => cycleBubbleType(e, b.id)}
-                        className={`absolute pointer-events-auto cursor-move group/bubble ${getBubbleClasses(b.type)}`}
+                        className={`absolute cursor-move group/bubble ${getBubbleClasses(b.type)}`}
                         style={{ 
                             left: `${b.x}%`, 
                             top: `${b.y}%`, 
@@ -224,7 +239,7 @@ export const Panel: React.FC<PanelProps> = ({
                             contentEditable 
                             suppressContentEditableWarning
                             onBlur={(e) => handleBubbleTextChange(b.id, e.currentTarget.innerText)}
-                            className="bubble-content"
+                            className="bubble-content min-w-[20px] focus:outline-none focus:bg-yellow-100/50 rounded"
                         >
                             {b.text}
                         </div>
@@ -282,6 +297,7 @@ export const Panel: React.FC<PanelProps> = ({
                     <button onClick={(e) => { e.stopPropagation(); setIsRemixing(true); }} className="control-btn bg-green-400" title="Remix Image">🎨</button>
                     <button onClick={(e) => { e.stopPropagation(); setIsRevisingScript(true); }} className="control-btn bg-orange-300" title="Revise Script">📝</button>
                     <button onClick={(e) => { e.stopPropagation(); onRegenerate(face.id); }} className="control-btn bg-white" title="Regenerate Image">🔄</button>
+                    <button onClick={handleDownloadPanel} className="control-btn bg-blue-500 text-white" title="Export Panel">💾</button>
                     <button onClick={handleAddBubble} className="control-btn bg-blue-300" title="Add Bubble">💬</button>
                 </div>
             )}
