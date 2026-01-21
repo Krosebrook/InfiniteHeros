@@ -71,18 +71,11 @@
         width: var(--page-width);
         height: var(--page-height);
         transform-style: preserve-3d;
-        transition: transform 0.5s ease;
+        /* Transition handled by Framer Motion now, but we keep base styles */
       }
       
-      /* Shift book right when opened to center the spread */
-      .book.opened {
-          transform: translateX(25%); 
-      }
-      @media (min-width: 1000px) {
-           /* On large screens, shift it so the spread is centered */
-          .book.opened { transform: translateX(calc(var(--page-width) / 2)); }
-      }
-
+      /* Shift book right when opened to center the spread (Handled by Framer Motion variants) */
+      
       .paper {
         position: absolute;
         top: 0;
@@ -91,12 +84,8 @@
         height: 100%;
         transform-origin: left center;
         transform-style: preserve-3d;
-        transition: transform 0.8s cubic-bezier(0.645, 0.045, 0.355, 1.000);
         cursor: pointer;
-      }
-
-      .paper.flipped {
-        transform: rotateY(-180deg);
+        /* Transition handled by Framer Motion */
       }
 
       .front, .back {
@@ -244,12 +233,8 @@
              overflow: visible; 
         }
 
-        /* On mobile, when book is opened, shift it 100% to the right.
-           Since the book container is centered, shifting it by its full width
-           places the spine (left edge) at the screen center.
-           This ensures the LEFT page (Back of previous sheet) is centered in the view.
-           Users can swipe/scroll right to see the RIGHT page. */
-        .book.opened { transform: translateX(100%); }
+        /* On mobile, when book is opened, shift it 100% to the right. */
+        /* Handled by Framer Motion logic now */
       }
     </style>
   <script type="importmap">
@@ -261,7 +246,8 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
     "jspdf": "https://aistudiocdn.com/jspdf@^3.0.3",
-    "jszip": "https://aistudiocdn.com/jszip@^3.10.1"
+    "jszip": "https://aistudiocdn.com/jszip@^3.10.1",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^11.0.8"
   }
 }
 </script>

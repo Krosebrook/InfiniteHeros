@@ -5,6 +5,7 @@
 */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ComicFace, Bubble } from './types';
 import { LoadingFX } from './LoadingFX';
 
@@ -135,7 +136,10 @@ export const Panel: React.FC<PanelProps> = ({
     if (face.type === 'letters') {
         if (face.isLoading && !face.lettersContent) return <div className="w-full h-full"><LoadingFX message="Sorting Mail" /></div>;
         return (
-            <div className="w-full h-full bg-[#fdfbf7] p-8 overflow-y-auto font-serif relative">
+            <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="w-full h-full bg-[#fdfbf7] p-8 overflow-y-auto font-serif relative"
+            >
                 <div className="border-b-4 border-black mb-6 pb-2">
                     <h2 className="font-comic text-4xl text-black">LETTERS TO THE EDITOR</h2>
                 </div>
@@ -147,7 +151,7 @@ export const Panel: React.FC<PanelProps> = ({
                         </div>
                     ))}
                 </div>
-            </div>
+            </motion.div>
         );
     }
 
@@ -158,32 +162,51 @@ export const Panel: React.FC<PanelProps> = ({
     const isFullBleed = face.type === 'cover' || face.type === 'back_cover';
 
     return (
-        <div 
+        <motion.div 
             className={`panel-container relative group ${isFullBleed ? '!p-0 !bg-[#0a0a0a]' : ''}`}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
         >
             <div className="gloss"></div>
             
             {face.videoUrl ? (
                  <video src={face.videoUrl} autoPlay loop muted playsInline className={`panel-image ${isFullBleed ? '!object-cover' : ''}`} />
             ) : (
-                 face.imageUrl && <img src={face.imageUrl} alt="Comic panel" className={`panel-image ${isFullBleed ? '!object-cover' : ''}`} />
+                 face.imageUrl && <motion.img 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    transition={{ duration: 0.5 }}
+                    src={face.imageUrl} alt="Comic panel" 
+                    className={`panel-image ${isFullBleed ? '!object-cover' : ''}`} 
+                 />
             )}
 
             {/* Render Dynamic HTML Bubbles */}
             <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
-                {face.bubbles?.map(b => (
-                    <div
+                <AnimatePresence>
+                {face.bubbles?.map((b, i) => (
+                    <motion.div
                         key={b.id}
+                        initial={{ scale: 0, opacity: 0, rotate: i % 2 === 0 ? -10 : 10 }}
+                        animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                        exit={{ scale: 0, opacity: 0 }}
+                        transition={{ 
+                            type: "spring", 
+                            stiffness: 400, 
+                            damping: 15, 
+                            delay: 0.2 + (i * 0.15) 
+                        }}
                         draggable
-                        onDragStart={(e) => handleDragStart(e, b.id)}
+                        onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, b.id)}
                         onDoubleClick={(e) => cycleBubbleType(e, b.id)}
                         className={`absolute pointer-events-auto cursor-move group/bubble ${getBubbleClasses(b.type)}`}
                         style={{ 
                             left: `${b.x}%`, 
                             top: `${b.y}%`, 
-                            transform: 'translate(-50%, -50%)',
+                            transform: 'translate(-50%, -50%)', 
                         }}
                     >
                         {/* Bubble Tail for Speech */}
@@ -205,8 +228,9 @@ export const Panel: React.FC<PanelProps> = ({
                         >
                             {b.text}
                         </div>
-                    </div>
+                    </motion.div>
                 ))}
+                </AnimatePresence>
             </div>
             
             {/* Overlays */}
@@ -276,14 +300,19 @@ export const Panel: React.FC<PanelProps> = ({
             )}
 
             {face.type === 'cover' && (
-                 <div className="absolute bottom-20 inset-x-0 flex justify-center z-20">
+                 <motion.div 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 1 }}
+                    className="absolute bottom-20 inset-x-0 flex justify-center z-20"
+                 >
                      <button onClick={(e) => { e.stopPropagation(); onOpenBook(); }}
                       disabled={!allFaces.find(f => f.pageIndex === 2)?.imageUrl}
                       className="comic-btn bg-yellow-400 px-10 py-4 text-3xl font-bold hover:scale-105 animate-bounce disabled:animate-none disabled:bg-gray-400">
                          {(!allFaces.find(f => f.pageIndex === 2)?.imageUrl) ? "PRINTING..." : "READ ISSUE #1"}
                      </button>
-                 </div>
+                 </motion.div>
             )}
-        </div>
+        </motion.div>
     );
 }
