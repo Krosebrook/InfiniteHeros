@@ -33,22 +33,39 @@ export const Panel: React.FC<PanelProps> = ({
     const [isRevisingScript, setIsRevisingScript] = useState(false);
     const [remixPrompt, setRemixPrompt] = useState("");
     const [scriptPrompt, setScriptPrompt] = useState("");
+    
+    // Enhanced Drag State
     const [draggedBubble, setDraggedBubble] = useState<{ id: string, type: 'pos' | 'tail' } | null>(null);
+    const [draggedCoords, setDraggedCoords] = useState<{ x: number, y: number } | null>(null);
+
     const [selectedAspectRatio, setSelectedAspectRatio] = useState("1:1");
 
     const handleDragStart = (e: React.DragEvent, id: string, type: 'pos' | 'tail') => {
         setDraggedBubble({ id, type });
         e.dataTransfer.effectAllowed = "move";
+        // Hide default ghost image to use our custom live render
         const img = new Image();
         img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; 
         e.dataTransfer.setDragImage(img, 0, 0);
     };
 
-    const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        if (!draggedBubble) return;
+        
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        // Calculate percentage coordinates
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        
+        setDraggedCoords({ x, y });
+    };
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         if (!draggedBubble || !face || !face.bubbles || !onBubbleUpdate) return;
+        
+        // Use last dragged coords or current mouse pos
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 100;
         const y = ((e.clientY - rect.top) / rect.height) * 100;
@@ -56,12 +73,13 @@ export const Panel: React.FC<PanelProps> = ({
         const updatedBubbles = face.bubbles.map(b => {
             if (b.id === draggedBubble.id) {
                 if (draggedBubble.type === 'pos') return { ...b, x, y };
-                else return { ...b, tailX: x - b.x, tailY: y - b.y };
+                else return { ...b, tailX: x, tailY: y };
             }
             return b;
         });
         onBubbleUpdate(face.id, updatedBubbles);
         setDraggedBubble(null);
+        setDraggedCoords(null);
     };
 
     const handleBubbleTextChange = (id: string, text: string) => {
@@ -72,7 +90,7 @@ export const Panel: React.FC<PanelProps> = ({
     const handleAddBubble = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!face || !onBubbleUpdate) return;
-        const newBubble: Bubble = { id: `manual-${Date.now()}`, text: "...", type: 'speech', x: 50, y: 50, tailX: 0, tailY: 10 };
+        const newBubble: Bubble = { id: `manual-${Date.now()}`, text: "...", type: 'speech', x: 50, y: 50, tailX: 50, tailY: 80 };
         onBubbleUpdate(face.id, [...(face.bubbles || []), newBubble]);
     };
 
@@ -110,6 +128,48 @@ export const Panel: React.FC<PanelProps> = ({
             case 'sfx': return 'comic-bubble-sfx';
             default: return 'comic-bubble-speech';
         }
+    };
+
+    const getRenderCoords = (b: Bubble) => {
+        let x = b.x;
+        let y = b.y;
+        
+        // If drag is active for position, override x,y
+        if (draggedBubble?.id === b.id && draggedBubble.type === 'pos' && draggedCoords) {
+            x = draggedCoords.x;
+            y = draggedCoords.y;
+        }
+
+        // Default tail to reasonable offset if undefined
+        let tx = b.tailX !== undefined ? b.tailX : x;
+        let ty = b.tailY !== undefined ? b.tailY : Math.min(y + 20, 100);
+
+        // If drag is active for tail, override tx,ty
+        if (draggedBubble?.id === b.id && draggedBubble.type === 'tail' && draggedCoords) {
+            tx = draggedCoords.x;
+            ty = draggedCoords.y;
+        }
+
+        return { x, y, tx, ty };
+    };
+
+    // Construct SVG path for the speech tail
+    const makeTailPath = (x: number, y: number, tx: number, ty: number) => {
+        const w = 4; // Base width
+        const dx = tx - x;
+        const dy = ty - y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len < 1) return "";
+        
+        const nx = -dy / len;
+        const ny = dx / len;
+        
+        const x1 = x + nx * w;
+        const y1 = y + ny * w;
+        const x2 = x - nx * w;
+        const y2 = y - ny * w;
+        
+        return `M ${x1},${y1} L ${tx},${ty} L ${x2},${y2} Z`;
     };
 
     const renderPanels = () => {
@@ -173,42 +233,78 @@ export const Panel: React.FC<PanelProps> = ({
             <div className="gloss"></div>
             {renderPanels()}
 
+            {/* SVG Layer for Tails - Behind Bubbles */}
+            <div className="absolute inset-0 z-10 pointer-events-none w-full h-full overflow-hidden">
+                <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    {face.bubbles?.filter(b => b.type === 'speech' || b.type === 'thought').map(b => {
+                        const { x, y, tx, ty } = getRenderCoords(b);
+                        const isDraggingTail = draggedBubble?.id === b.id && draggedBubble.type === 'tail';
+
+                        if (b.type === 'speech') {
+                            return (
+                                <g key={`tail-${b.id}`}>
+                                    <path 
+                                        d={makeTailPath(x, y, tx, ty)}
+                                        fill="white" stroke="black" strokeWidth="0.5"
+                                    />
+                                    {isDraggingTail && (
+                                         <line x1={x} y1={y} x2={tx} y2={ty} stroke="red" strokeWidth="0.3" strokeDasharray="1,1" />
+                                    )}
+                                </g>
+                            );
+                        } else {
+                            // Thought bubbles use dots
+                            return (
+                                <g key={`tail-${b.id}`}>
+                                    <circle cx={(x + tx)/2} cy={(y + ty)/2} r="2" fill="white" stroke="black" strokeWidth="0.5" />
+                                    <circle cx={tx} cy={ty} r="1" fill="white" stroke="black" strokeWidth="0.5" />
+                                    {isDraggingTail && (
+                                         <line x1={x} y1={y} x2={tx} y2={ty} stroke="red" strokeWidth="0.3" strokeDasharray="1,1" />
+                                    )}
+                                </g>
+                            )
+                        }
+                    })}
+                </svg>
+            </div>
+
             <div className="absolute inset-0 z-20 overflow-hidden pointer-events-none">
                 <AnimatePresence>
-                {face.bubbles?.map((b, i) => (
-                    <motion.div
-                        key={b.id}
-                        initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0 }}
-                        className={`absolute cursor-move pointer-events-auto group/bubble ${getBubbleClasses(b.type)}`}
-                        style={{ left: `${b.x}%`, top: `${b.y}%`, transform: 'translate(-50%, -50%)' }}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, b.id, 'pos')}
-                        onDoubleClick={(e) => cycleBubbleType(e, b.id)}
-                    >
-                        {/* Bubble Tail Handle */}
-                        {(b.type === 'speech' || b.type === 'thought') && (
-                            <div 
+                {face.bubbles?.map((b, i) => {
+                    const { x, y, tx, ty } = getRenderCoords(b);
+                    const isDraggingThis = draggedBubble?.id === b.id;
+
+                    return (
+                        <React.Fragment key={b.id}>
+                            <motion.div
+                                initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0 }}
+                                className={`absolute cursor-move pointer-events-auto group/bubble ${getBubbleClasses(b.type)} ${isDraggingThis && draggedBubble.type === 'pos' ? 'opacity-80 z-50 ring-2 ring-yellow-400' : ''}`}
+                                style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
                                 draggable
-                                onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, b.id, 'tail')}
-                                className="absolute w-4 h-4 bg-yellow-400 border border-black rounded-full opacity-0 group-hover/bubble:opacity-100 cursor-crosshair z-50"
-                                style={{ left: `calc(50% + ${b.tailX || 0}%)`, top: `calc(50% + ${b.tailY || 0}%)`, transform: 'translate(-50%, -50%)' }}
-                            />
-                        )}
-
-                        {/* SVG Tail rendering */}
-                        {b.type === 'speech' && b.tailX !== undefined && (
-                            <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none" style={{ transform: 'translate(-50%, -50%)', left: '50%', top: '50%' }}>
-                                <path 
-                                    d={`M 0 0 L ${b.tailX * 2} ${b.tailY! * 2} L 10 0 Z`} 
-                                    fill="white" stroke="black" strokeWidth="2" 
-                                />
-                            </svg>
-                        )}
-
-                        <button onClick={(e) => handleDeleteBubble(e, b.id)} className="absolute -top-4 -right-4 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center font-bold text-xs border-2 border-black opacity-0 group-hover/bubble:opacity-100 transition-opacity" aria-label="Delete bubble">×</button>
-                        <div contentEditable suppressContentEditableWarning onBlur={(e) => handleBubbleTextChange(b.id, e.currentTarget.innerText)} className="bubble-content min-w-[20px] focus:outline-none">{b.text}</div>
-                    </motion.div>
-                ))}
+                                onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, b.id, 'pos')}
+                                onDoubleClick={(e) => cycleBubbleType(e, b.id)}
+                            >
+                                <button onClick={(e) => handleDeleteBubble(e, b.id)} className="absolute -top-4 -right-4 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center font-bold text-xs border-2 border-black opacity-0 group-hover/bubble:opacity-100 transition-opacity" aria-label="Delete bubble">×</button>
+                                <div contentEditable suppressContentEditableWarning onBlur={(e) => handleBubbleTextChange(b.id, e.currentTarget.innerText)} className="bubble-content min-w-[20px] focus:outline-none">{b.text}</div>
+                            </motion.div>
+                            
+                            {/* Draggable Tail Target Handle */}
+                            {(b.type === 'speech' || b.type === 'thought') && (
+                                <div
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, b.id, 'tail')}
+                                    className={`absolute w-6 h-6 rounded-full cursor-crosshair z-30 pointer-events-auto flex items-center justify-center transition-all ${isDraggingThis && draggedBubble.type === 'tail' ? 'opacity-100 scale-125 bg-red-500 border-2 border-white shadow-md' : 'opacity-0 group-hover:opacity-100 bg-yellow-400 border border-black hover:scale-110'}`}
+                                    style={{ left: `${tx}%`, top: `${ty}%`, transform: 'translate(-50%, -50%)' }}
+                                    title="Drag tail to speaker"
+                                >
+                                    {(isDraggingThis && draggedBubble.type === 'tail') && (
+                                        <div className="w-1 h-1 bg-white rounded-full" />
+                                    )}
+                                </div>
+                            )}
+                        </React.Fragment>
+                    );
+                })}
                 </AnimatePresence>
             </div>
             

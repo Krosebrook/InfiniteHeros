@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion';
 import { ComicFace, TOTAL_PAGES, Persona, Bubble, WorldState } from './types';
 import { Panel } from './Panel';
@@ -46,6 +46,11 @@ export const Book: React.FC<BookProps> = (props) => {
     const rotateX = useTransform(smoothY, [-0.5, 0.5], [5, -5]);
     const rotateY = useTransform(smoothX, [-0.5, 0.5], [-5, 5]);
 
+    // Swipe Gesture Refs
+    const touchStartX = useRef<number | null>(null);
+    const touchEndX = useRef<number | null>(null);
+    const isSwiping = useRef(false);
+
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth <= 768);
         window.addEventListener('resize', handleResize);
@@ -62,9 +67,24 @@ export const Book: React.FC<BookProps> = (props) => {
 
     const handleMouseLeave = () => { mouseX.set(0); mouseY.set(0); };
     
+    // Updated logic to support simple "next/prev" click behavior if not swiping
     const handlePageClick = (i: number) => { 
+        if (isSwiping.current) return;
+        
         soundManager.play('flip'); 
-        props.onSheetClick(i); 
+        
+        // Smart navigation: 
+        // If clicking the current active sheet (right side), go forward
+        if (i === props.currentSheetIndex) {
+            props.onSheetClick(i + 1);
+        } 
+        // If clicking the previous sheet (left side), go backward
+        else if (i === props.currentSheetIndex - 1) {
+            props.onSheetClick(i);
+        } else {
+            // Fallback for jump
+            props.onSheetClick(i); 
+        }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent, i: number) => {
@@ -81,6 +101,48 @@ export const Book: React.FC<BookProps> = (props) => {
             sheetsToRender.push({ front: props.comicFaces.find(f => f.pageIndex === i), back: props.comicFaces.find(f => f.pageIndex === i + 1) });
         }
     } else if (props.isSetupVisible) { sheetsToRender.push({ front: undefined, back: undefined }); }
+
+    // Touch Handlers
+    const onTouchStart = (e: React.TouchEvent) => {
+        touchEndX.current = null;
+        touchStartX.current = e.targetTouches[0].clientX;
+        isSwiping.current = false;
+    };
+
+    const onTouchMove = (e: React.TouchEvent) => {
+        touchEndX.current = e.targetTouches[0].clientX;
+        if (touchStartX.current !== null) {
+            const diff = Math.abs(touchStartX.current - touchEndX.current);
+            if (diff > 10) isSwiping.current = true; // Mark as swipe if moved significantly
+        }
+    };
+
+    const onTouchEnd = () => {
+        if (!touchStartX.current || !touchEndX.current) return;
+        
+        const distance = touchStartX.current - touchEndX.current;
+        const minSwipeDistance = 50;
+        
+        const isLeftSwipe = distance > minSwipeDistance;
+        const isRightSwipe = distance < -minSwipeDistance;
+
+        if (isLeftSwipe) {
+            // Swipe Left -> Next Page
+            if (props.currentSheetIndex < sheetsToRender.length) {
+                soundManager.play('flip');
+                props.onSheetClick(props.currentSheetIndex + 1);
+            }
+        } else if (isRightSwipe) {
+            // Swipe Right -> Prev Page
+            if (props.currentSheetIndex > 0) {
+                soundManager.play('flip');
+                props.onSheetClick(props.currentSheetIndex - 1);
+            }
+        }
+        
+        // Reset after a short delay to allow click handler to check isSwiping if it fires immediately
+        setTimeout(() => { isSwiping.current = false; }, 100);
+    };
 
     const bookVariants = {
         closed: { x: 0, scale: 1, filter: "blur(0px) brightness(1)" },
@@ -129,7 +191,15 @@ export const Book: React.FC<BookProps> = (props) => {
         )}
 
         <motion.div style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}>
-            <motion.div className="book" variants={bookVariants} animate={getBookState()} transition={{ type: "spring", stiffness: 40, damping: 15, mass: 1.2 }}>
+            <motion.div 
+                className="book" 
+                variants={bookVariants} 
+                animate={getBookState()} 
+                transition={{ type: "spring", stiffness: 40, damping: 15, mass: 1.2 }}
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
+            >
               {sheetsToRender.map((sheet, i) => (
                   <motion.div 
                        key={i} 

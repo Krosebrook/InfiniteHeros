@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -91,6 +90,15 @@ export const generateBeat = async (
     preferredLayout?: PanelLayout
 ): Promise<Beat> => {
     const lastPage = history[history.length - 1];
+    
+    // Lookback Mechanism: Extract context from last 3 pages
+    const lookbackWindow = history.slice(-3);
+    const storySoFar = lookbackWindow.map(page => {
+        const panels = page.panels?.map(p => `[${p.description}]`).join(' ') || '';
+        const dialogue = page.bubbles?.map(b => `${b.character || 'Unknown'}: "${b.text}"`).join(' | ') || '';
+        return `Page ${page.pageIndex}: ${panels} \nDialogue: ${dialogue}`;
+    }).join('\n\n');
+
     const prompt = `
 Advance ${genre} comic (Page ${pageNum}). Tone: ${tone}. Lang: ${langName}.
 CHARS: Hero(${hero.name}), Ally(${friend?.name}), Villain(${villain?.name}).
@@ -98,9 +106,15 @@ WORLD: Health(${worldState.health}%), Inv(${worldState.inventory.map(i=>i.name).
 ROLL: ${rollResult ? `Roll ${rollResult.value} (${rollResult.isSuccess?'Success':'Fail'})` : 'None'}.
 ACTION: ${lastPage?.resolvedChoice}.
 
+PREVIOUS CONTEXT (Use for continuity):
+${storySoFar}
+
 INSTRUCTIONS:
-1. Advance story. 2. Track World State. 3. Update Health (delta -20 to +20).
-4. Discover new NPCs if applicable. 5. Trigger Achievements if applicable.
+1. Advance story organically from PREVIOUS CONTEXT.
+2. Maintain consistent character voices based on previous dialogue.
+3. Track World State. 
+4. Update Health (delta -20 to +20).
+5. Discover new NPCs if applicable.
 ${preferredLayout ? `6. PREFERRED LAYOUT: ${preferredLayout}` : ''}
 
 JSON:
@@ -129,9 +143,14 @@ export const reviseBeat = async (currentBeat: Beat, instruction: string): Promis
 
 export const generatePersona = async (desc: string, artStyle: string, genre: string): Promise<Persona> => {
     const ai = getAI();
+    const prompt = `Concept Art Character Sheet. Genre: ${genre}. Art Style: ${artStyle}. 
+    Character Description: ${desc}. 
+    Focus: Full body design, expressive pose, detailed clothing and accessories fitting the genre. 
+    Background: Neutral, solid color. NO TEXT, NO LABELS, NO SPEECH BUBBLES.`;
+
     const res = await ai.models.generateContent({
         model: MODEL_IMAGE_GEN_NAME,
-        contents: { parts: [{ text: `Character sheet: ${desc}. Style: ${artStyle}. No text, neutral background.` }] },
+        contents: { parts: [{ text: prompt }] },
         config: { imageConfig: { aspectRatio: '1:1' } }
     });
     const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
@@ -155,9 +174,30 @@ export const describeCharacter = async (base64: string): Promise<string> => {
 
 export const generateImage = async (panelDesc: string, artStyle: string, genre: string, hero: Persona | null, friend: Persona | null, villain: Persona | null, worldState: WorldState, aspectRatio: string = '1:1'): Promise<string> => {
     const parts = [];
-    if (hero?.base64) parts.push({ text: "Ref Hero:" }, { inlineData: { mimeType: 'image/jpeg', data: hero.base64 } });
-    const prompt = `Style: ${artStyle}. Genre: ${genre}. Scene: ${panelDesc}. NO TEXT.`;
+    
+    // Include all character references if they exist, prioritizing locked ones in text description
+    if (hero?.base64) {
+        const label = hero.locked ? "Strict Reference Hero (Main Character):" : "Reference Hero:";
+        parts.push({ text: label }, { inlineData: { mimeType: 'image/jpeg', data: hero.base64 } });
+    }
+    if (friend?.base64) {
+        const label = friend.locked ? "Strict Reference Ally:" : "Reference Ally:";
+        parts.push({ text: label }, { inlineData: { mimeType: 'image/jpeg', data: friend.base64 } });
+    }
+    if (villain?.base64) {
+        const label = villain.locked ? "Strict Reference Villain:" : "Reference Villain:";
+        parts.push({ text: label }, { inlineData: { mimeType: 'image/jpeg', data: villain.base64 } });
+    }
+
+    let prompt = `Style: ${artStyle}. Genre: ${genre}. Scene: ${panelDesc}. NO TEXT.`;
+    
+    // Append instruction for locked characters
+    if (hero?.locked || friend?.locked || villain?.locked) {
+        prompt += " IMPORTANT: The provided reference images for locked characters must be followed STRICTLY for facial features, clothing, and style.";
+    }
+
     parts.push({ text: prompt });
+    
     const ai = getAI();
     const res = await ai.models.generateContent({ model: MODEL_IMAGE_GEN_NAME, contents: { parts }, config: { imageConfig: { aspectRatio } } });
     const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);

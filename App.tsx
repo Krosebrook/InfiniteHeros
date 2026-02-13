@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -33,6 +32,54 @@ const INITIAL_ACHIEVEMENTS: Achievement[] = [
     { id: 'survivor', title: 'Survivor', description: 'Survive a scene with less than 20% health.', unlocked: false },
     { id: 'multiversalist', title: 'Multiversalist', description: 'Visited 5 different timeline branches.', unlocked: false },
 ];
+
+const GENRE_CHARACTER_PROMPTS: Record<string, { hero: string, friend: string, villain: string }> = {
+    "Classic Horror": {
+        hero: "A terrified but determined survivor holding a lantern, Victorian or 1920s attire, weary expression",
+        friend: "A skeptical professor with tweed jacket and glasses, carrying a tome",
+        villain: "A looming shadow figure or eldritch abomination, obscured features, menacing aura"
+    },
+    "Superhero Action": {
+        hero: "A superhero in a dynamic costume with a chest emblem and cape, glowing energy hands",
+        friend: "A tech-support sidekick with goggles, utility belt, and a laptop",
+        villain: "A supervillain in power armor with a menacing helmet and energy crackles"
+    },
+    "Dark Sci-Fi": {
+        hero: "A cybernetic bounty hunter with a neon-lit trenchcoat and a robotic arm",
+        friend: "A hacked service droid with exposed wiring and graffiti",
+        villain: "A corporate overlord in a sleek suit with a digital face mask"
+    },
+    "High Fantasy": {
+        hero: "A valiant knight in shining plate armor wielding a glowing sword",
+        friend: "A mysterious hooded ranger with a bow and elven features",
+        villain: "A dark sorcerer in spiked robes wielding a staff of green fire"
+    },
+    "Neon Noir Detective": {
+        hero: "A gritty private eye in a fedora and trenchcoat, rain-soaked, smoking",
+        friend: "A street-smart informant with cybernetic eyes and punk hair",
+        villain: "A corrupt synth-lord in a high-collar suit, holding a glass of wine"
+    },
+    "Wasteland Apocalypse": {
+        hero: "A road warrior in scavenged leather armor with goggles and a dust scarf",
+        friend: "A mutant dog companion with mechanical prosthetics",
+        villain: "A warlord in tire-tread armor with a skull mask and chains"
+    },
+    "Lighthearted Comedy": {
+        hero: "A clumsy but lovable protagonist in casual hoodie and jeans, expressive face",
+        friend: "An energetic best friend with messy hair and a bright backpack",
+        villain: "A snobbish rival in an expensive suit looking disdainful"
+    },
+    "Teen Drama / Slice of Life": {
+        hero: "A high school student with a unique hairstyle and school uniform, carrying books",
+        friend: "A cool classmate with headphones around neck and a skateboard",
+        villain: "A popular student with crossed arms and a judgmental smirk"
+    },
+    "Custom": {
+        hero: "A unique main character for a comic book adventure",
+        friend: "A loyal sidekick or companion character",
+        villain: "A menacing antagonist or rival character"
+    }
+};
 
 const uuidv4 = () => {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -369,7 +416,13 @@ const InfiniteHeroesGame: React.FC = () => {
                 
                 const allBubbles: any[] = [];
                 beat.panels.forEach((p, i) => {
-                     const bubbles = p.bubbles.map(b => ({ ...b, id: uuidv4(), tailX: 0, tailY: 10 })); 
+                     // initialize with explicit center coordinates and tail target
+                     const bubbles = p.bubbles.map(b => ({ 
+                         ...b, 
+                         id: uuidv4(), 
+                         x: 50, y: 50, 
+                         tailX: 50, tailY: 80 
+                     })); 
                      allBubbles.push(...bubbles);
                 });
 
@@ -495,7 +548,7 @@ const InfiniteHeroesGame: React.FC = () => {
                 />
             )}
 
-            <Inventory items={worldState.inventory} />
+            <Inventory items={worldState.inventory} status={worldState.status} />
 
             <Setup 
                 show={showSetup} isTransitioning={isTransitioning} 
@@ -523,9 +576,25 @@ const InfiniteHeroesGame: React.FC = () => {
                     const desc = await aiService.describeCharacter(base64);
                     setVillain({ base64, desc, name: "Nemesis", backstory: desc });
                 }}
-                onAutoGenerateHero={async () => setHero(await aiService.generatePersona("Classic hero", selectedArtStyle, selectedGenre))}
-                onAutoGenerateFriend={async () => setFriend(await aiService.generatePersona("Loyal sidekick", selectedArtStyle, selectedGenre))}
-                onAutoGenerateVillain={async () => setVillain(await aiService.generatePersona("Evil menace", selectedArtStyle, selectedGenre))}
+                onAutoGenerateHero={async () => {
+                    let desc = GENRE_CHARACTER_PROMPTS[selectedGenre]?.hero;
+                    if (selectedGenre === 'Custom' && customPremise) {
+                        desc = `A protagonist for a story about: ${customPremise}`;
+                    } else if (!desc) {
+                        desc = GENRE_CHARACTER_PROMPTS['Custom'].hero;
+                    }
+                    setHero(await aiService.generatePersona(desc, selectedArtStyle, selectedGenre));
+                }}
+                onAutoGenerateFriend={async () => {
+                    let desc = GENRE_CHARACTER_PROMPTS[selectedGenre]?.friend;
+                    if (!desc) desc = GENRE_CHARACTER_PROMPTS['Custom'].friend;
+                    setFriend(await aiService.generatePersona(desc, selectedArtStyle, selectedGenre));
+                }}
+                onAutoGenerateVillain={async () => {
+                    let desc = GENRE_CHARACTER_PROMPTS[selectedGenre]?.villain;
+                    if (!desc) desc = GENRE_CHARACTER_PROMPTS['Custom'].villain;
+                    setVillain(await aiService.generatePersona(desc, selectedArtStyle, selectedGenre));
+                }}
                 onGenerateBios={async () => {
                     const bios = await aiService.generateCharacterBios(selectedGenre, storyTone, LANGUAGES.find(l=>l.code===selectedLanguage)!.name, !!friend, !!villain);
                     if (hero) setHero({...hero, name: bios.hero.name, backstory: bios.hero.backstory});
@@ -537,6 +606,9 @@ const InfiniteHeroesGame: React.FC = () => {
                 onLayoutChange={setSelectedLayout}
                 onPremiseChange={setCustomPremise} onRichModeChange={setRichMode}
                 onLaunch={handleLaunch}
+                onToggleHeroLock={() => { if(hero) setHero({...hero, locked: !hero.locked}); }}
+                onToggleFriendLock={() => { if(friend) setFriend({...friend, locked: !friend.locked}); }}
+                onToggleVillainLock={() => { if(villain) setVillain({...villain, locked: !villain.locked}); }}
             />
 
             <Book 

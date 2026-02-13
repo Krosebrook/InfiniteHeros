@@ -91,7 +91,7 @@ export interface Bubble {
     character?: string;
     x: number; // Percent 0-100 relative to PAGE
     y: number; // Percent 0-100 relative to PAGE
-    tailX?: number; // Relative to bubble center
+    tailX?: number; // Percent 0-100 relative to PAGE (Target coordinates)
     tailY?: number; 
     panelIndex?: number;
 }
@@ -155,6 +155,7 @@ export interface Persona {
   desc: string;
   name?: string;
   backstory?: string;
+  locked?: boolean;
 }
 
 export interface TTSSettings {

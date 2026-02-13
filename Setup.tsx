@@ -38,6 +38,9 @@ interface SetupProps {
     onPremiseChange: (val: string) => void;
     onRichModeChange: (val: boolean) => void;
     onLaunch: () => void;
+    onToggleHeroLock: () => void;
+    onToggleFriendLock: () => void;
+    onToggleVillainLock: () => void;
 }
 
 // Map genres to recommended art styles for a more curated experience
@@ -94,10 +97,11 @@ interface CharacterUploaderProps {
     onUpload: (file: File) => Promise<void>;
     onAutoGenerate: () => void;
     isRequired?: boolean;
+    onToggleLock: () => void;
 }
 
 const CharacterUploader: React.FC<CharacterUploaderProps> = ({ 
-    title, role, colorClass, borderColor, textColor, persona, onUpload, onAutoGenerate, isRequired 
+    title, role, colorClass, borderColor, textColor, persona, onUpload, onAutoGenerate, isRequired, onToggleLock
 }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -146,7 +150,16 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                 <div className="flex justify-between items-center mb-2">
                     <p className={`font-comic text-lg uppercase font-bold ${textColor}`}>{role}</p>
                     {persona ? (
-                        <span className="text-green-600 font-bold font-comic text-sm animate-pulse">✓ READY</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-green-600 font-bold font-comic text-sm animate-pulse">✓ READY</span>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onToggleLock(); soundManager.play('click'); }}
+                                className={`text-xl ${persona.locked ? 'grayscale-0' : 'grayscale opacity-50 hover:opacity-100'} transition-all`}
+                                title={persona.locked ? "Character Locked (Will be used as reference)" : "Character Unlocked"}
+                            >
+                                {persona.locked ? '🔒' : '🔓'}
+                            </button>
+                        </div>
                     ) : (
                         !isLoading && <button 
                             onClick={() => { soundManager.play('click'); onAutoGenerate(); }} 
@@ -174,7 +187,10 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                 
                 {persona ? (
                     <div className="flex flex-col items-center gap-2 mt-2">
-                         <img src={`data:image/jpeg;base64,${persona.base64}`} alt={`Preview of ${persona.name}`} className="w-24 h-24 object-cover border-2 border-black rotate-[-2deg] shadow-sm" />
+                         <div className="relative">
+                            <img src={`data:image/jpeg;base64,${persona.base64}`} alt={`Preview of ${persona.name}`} className={`w-24 h-24 object-cover border-2 border-black rotate-[-2deg] shadow-sm ${persona.locked ? 'ring-4 ring-yellow-400' : ''}`} />
+                            {persona.locked && <div className="absolute -top-2 -right-2 text-xl drop-shadow-md">🔒</div>}
+                         </div>
                          
                          {persona.name && (
                              <div className="bg-yellow-100 p-2 border border-black w-full text-left rotate-1">
@@ -185,9 +201,9 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
 
                          <div className="flex w-full gap-2">
                             <label 
-                                className="cursor-pointer comic-btn bg-yellow-400 text-black text-xs px-2 py-2 hover:bg-yellow-300 flex-1 text-center focus-within:ring-4 focus-within:ring-black" 
-                                tabIndex={0} 
-                                onKeyDown={handleKeyDown}
+                                className={`cursor-pointer comic-btn bg-yellow-400 text-black text-xs px-2 py-2 hover:bg-yellow-300 flex-1 text-center focus-within:ring-4 focus-within:ring-black ${persona.locked ? 'opacity-50 pointer-events-none' : ''}`} 
+                                tabIndex={persona.locked ? -1 : 0} 
+                                onKeyDown={!persona.locked ? handleKeyDown : undefined}
                                 role="button"
                                 aria-label={`Replace ${role} image`}
                             >
@@ -198,13 +214,14 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                                     accept="image/png, image/jpeg, image/webp" 
                                     className="sr-only" 
                                     onChange={handleFileChange} 
-                                    disabled={isLoading} 
+                                    disabled={isLoading || !!persona.locked} 
                                 />
                             </label>
                             <button 
-                                className="comic-btn bg-white text-black text-xs px-2 py-2 hover:bg-gray-100 flex-1 text-center" 
-                                onClick={() => { soundManager.play('click'); onAutoGenerate(); }}
+                                className={`comic-btn bg-white text-black text-xs px-2 py-2 hover:bg-gray-100 flex-1 text-center ${persona.locked ? 'opacity-50 pointer-events-none' : ''}`}
+                                onClick={() => { if(!persona.locked) { soundManager.play('click'); onAutoGenerate(); }}}
                                 aria-label={`Regenerate ${role} details`}
+                                disabled={!!persona.locked}
                             >
                                 REGENERATE
                             </button>
@@ -301,6 +318,7 @@ export const Setup: React.FC<SetupProps> = (props) => {
                         onUpload={props.onHeroUpload}
                         onAutoGenerate={props.onAutoGenerateHero}
                         isRequired={true}
+                        onToggleLock={props.onToggleHeroLock}
                     />
 
                     <CharacterUploader 
@@ -312,6 +330,7 @@ export const Setup: React.FC<SetupProps> = (props) => {
                         persona={props.friend}
                         onUpload={props.onFriendUpload}
                         onAutoGenerate={props.onAutoGenerateFriend}
+                        onToggleLock={props.onToggleFriendLock}
                     />
 
                     <div className="flex flex-col gap-3">
@@ -324,6 +343,7 @@ export const Setup: React.FC<SetupProps> = (props) => {
                             persona={props.villain}
                             onUpload={props.onVillainUpload}
                             onAutoGenerate={props.onAutoGenerateVillain}
+                            onToggleLock={props.onToggleVillainLock}
                         />
                         <button onClick={() => { playClick(); props.onGenerateBios(); }} 
                                 className="comic-btn bg-white text-black text-sm px-4 py-2 hover:bg-gray-100 flex items-center justify-center gap-2 mt-auto"
