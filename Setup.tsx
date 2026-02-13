@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { GENRES, ART_STYLES, LANGUAGES, TONES, Persona } from './types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { GENRES, ART_STYLES, LANGUAGES, TONES, PANEL_LAYOUTS, PanelLayout, Persona } from './types';
 import { soundManager } from './SoundManager';
 
 interface SetupProps {
@@ -18,13 +18,14 @@ interface SetupProps {
     selectedArtStyle: string;
     selectedLanguage: string;
     selectedTone: string;
+    selectedLayout: PanelLayout;
     customPremise: string;
     richMode: boolean;
     hasSave?: boolean;
     onResume?: () => void;
-    onHeroUpload: (file: File) => void;
-    onFriendUpload: (file: File) => void;
-    onVillainUpload: (file: File) => void;
+    onHeroUpload: (file: File) => Promise<void>;
+    onFriendUpload: (file: File) => Promise<void>;
+    onVillainUpload: (file: File) => Promise<void>;
     onAutoGenerateVillain: () => void;
     onAutoGenerateHero: () => void;
     onAutoGenerateFriend: () => void;
@@ -33,6 +34,7 @@ interface SetupProps {
     onArtStyleChange: (val: string) => void;
     onLanguageChange: (val: string) => void;
     onToneChange: (val: string) => void;
+    onLayoutChange: (val: PanelLayout) => void;
     onPremiseChange: (val: string) => void;
     onRichModeChange: (val: boolean) => void;
     onLaunch: () => void;
@@ -80,6 +82,158 @@ const Footer = () => {
         </div>
     </div>
   );
+};
+
+interface CharacterUploaderProps {
+    title: string;
+    role: string;
+    colorClass: string;
+    borderColor: string;
+    textColor: string;
+    persona: Persona | null;
+    onUpload: (file: File) => Promise<void>;
+    onAutoGenerate: () => void;
+    isRequired?: boolean;
+}
+
+const CharacterUploader: React.FC<CharacterUploaderProps> = ({ 
+    title, role, colorClass, borderColor, textColor, persona, onUpload, onAutoGenerate, isRequired 
+}) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        soundManager.play('click');
+        setError(null);
+
+        if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
+            setError("Format not supported. Use JPG/PNG.");
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setError("File too large (Max 5MB).");
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            await onUpload(file);
+            soundManager.play('pop');
+        } catch (err) {
+            console.error(err);
+            setError("Upload failed. Try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            inputRef.current?.click();
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-3">
+            <div className="font-comic text-xl text-black border-b-4 border-black mb-1">{title}</div>
+            
+            <div className={`p-3 border-4 border-dashed ${persona ? 'border-green-500 bg-green-50' : `${borderColor} ${colorClass}`} transition-colors flex-1 flex flex-col relative`}>
+                <div className="flex justify-between items-center mb-2">
+                    <p className={`font-comic text-lg uppercase font-bold ${textColor}`}>{role}</p>
+                    {persona ? (
+                        <span className="text-green-600 font-bold font-comic text-sm animate-pulse">✓ READY</span>
+                    ) : (
+                        !isLoading && <button 
+                            onClick={() => { soundManager.play('click'); onAutoGenerate(); }} 
+                            className="text-[10px] font-bold bg-black text-white px-2 py-1 hover:bg-gray-800 border border-transparent uppercase focus:outline-none focus:ring-4 focus:ring-yellow-400"
+                            aria-label={`Auto-generate ${role}`}
+                        >
+                           AUTO-GENERATE
+                        </button>
+                    )}
+                </div>
+
+                {/* Error Banner with ARIA Live */}
+                {error && (
+                    <div className="bg-red-100 text-red-700 text-xs font-bold p-2 mb-2 border-l-4 border-red-500" role="alert" aria-live="polite">
+                        ⚠️ {error}
+                    </div>
+                )}
+
+                {isLoading && (
+                    <div className="absolute inset-0 bg-white/80 z-10 flex flex-col items-center justify-center backdrop-blur-sm" aria-live="assertive" aria-label="Analyzing image">
+                        <div className="w-8 h-8 border-4 border-black border-t-yellow-400 rounded-full animate-spin mb-2" />
+                        <span className="font-comic text-sm animate-pulse">ANALYZING IMAGE...</span>
+                    </div>
+                )}
+                
+                {persona ? (
+                    <div className="flex flex-col items-center gap-2 mt-2">
+                         <img src={`data:image/jpeg;base64,${persona.base64}`} alt={`Preview of ${persona.name}`} className="w-24 h-24 object-cover border-2 border-black rotate-[-2deg] shadow-sm" />
+                         
+                         {persona.name && (
+                             <div className="bg-yellow-100 p-2 border border-black w-full text-left rotate-1">
+                                 <p className="font-comic text-lg leading-none">{persona.name}</p>
+                                 <p className="font-sans text-[10px] leading-tight text-gray-600 line-clamp-3">{persona.backstory}</p>
+                             </div>
+                         )}
+
+                         <div className="flex w-full gap-2">
+                            <label 
+                                className="cursor-pointer comic-btn bg-yellow-400 text-black text-xs px-2 py-2 hover:bg-yellow-300 flex-1 text-center focus-within:ring-4 focus-within:ring-black" 
+                                tabIndex={0} 
+                                onKeyDown={handleKeyDown}
+                                role="button"
+                                aria-label={`Replace ${role} image`}
+                            >
+                                REPLACE
+                                <input 
+                                    ref={inputRef} 
+                                    type="file" 
+                                    accept="image/png, image/jpeg, image/webp" 
+                                    className="sr-only" 
+                                    onChange={handleFileChange} 
+                                    disabled={isLoading} 
+                                />
+                            </label>
+                            <button 
+                                className="comic-btn bg-white text-black text-xs px-2 py-2 hover:bg-gray-100 flex-1 text-center" 
+                                onClick={() => { soundManager.play('click'); onAutoGenerate(); }}
+                                aria-label={`Regenerate ${role} details`}
+                            >
+                                REGENERATE
+                            </button>
+                         </div>
+                    </div>
+                ) : (
+                    <label 
+                        className={`comic-btn ${isRequired ? 'bg-blue-500 text-white hover:bg-blue-400' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'} text-lg px-3 py-6 block w-full cursor-pointer text-center h-full flex items-center justify-center flex-col transition-colors focus-within:ring-4 focus-within:ring-yellow-400`} 
+                        tabIndex={0} 
+                        onKeyDown={handleKeyDown}
+                        role="button"
+                        aria-label={`Upload image for ${role}`}
+                    >
+                        <span className="text-3xl mb-2" aria-hidden="true">📁</span>
+                        <span>UPLOAD IMAGE</span>
+                        <span className="text-xs font-sans opacity-70 mt-1">JPG, PNG (Max 5MB)</span>
+                        <input 
+                            ref={inputRef} 
+                            type="file" 
+                            accept="image/png, image/jpeg, image/webp" 
+                            className="sr-only" 
+                            onChange={handleFileChange} 
+                            disabled={isLoading} 
+                        />
+                    </label>
+                )}
+            </div>
+        </div>
+    );
 };
 
 export const Setup: React.FC<SetupProps> = (props) => {
@@ -137,119 +291,40 @@ export const Setup: React.FC<SetupProps> = (props) => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 text-left">
                     
-                    {/* COL 1: HERO */}
+                    <CharacterUploader 
+                        title="1. THE HERO"
+                        role="REQUIRED HERO"
+                        colorClass="bg-blue-50"
+                        borderColor="border-blue-300"
+                        textColor="text-blue-900"
+                        persona={props.hero}
+                        onUpload={props.onHeroUpload}
+                        onAutoGenerate={props.onAutoGenerateHero}
+                        isRequired={true}
+                    />
+
+                    <CharacterUploader 
+                        title="2. THE SIDEKICK"
+                        role="OPTIONAL ALLY"
+                        colorClass="bg-purple-50"
+                        borderColor="border-purple-300"
+                        textColor="text-purple-900"
+                        persona={props.friend}
+                        onUpload={props.onFriendUpload}
+                        onAutoGenerate={props.onAutoGenerateFriend}
+                    />
+
                     <div className="flex flex-col gap-3">
-                        <div className="font-comic text-xl text-black border-b-4 border-black mb-1">1. THE HERO</div>
-                        
-                        <div className={`p-3 border-4 border-dashed ${props.hero ? 'border-green-500 bg-green-50' : 'border-blue-300 bg-blue-50'} transition-colors flex-1 flex flex-col`}>
-                            <div className="flex justify-between items-center mb-2">
-                                <p className="font-comic text-lg uppercase font-bold text-blue-900">REQUIRED</p>
-                                {props.hero ? (
-                                    <span className="text-green-600 font-bold font-comic text-sm animate-pulse">✓ READY</span>
-                                ) : (
-                                    <button onClick={() => { playClick(); props.onAutoGenerateHero(); }} className="text-[10px] font-bold bg-black text-white px-2 py-1 hover:bg-gray-800 border border-transparent uppercase">
-                                       AUTO-GENERATE
-                                    </button>
-                                )}
-                            </div>
-                            
-                            {props.hero ? (
-                                <div className="flex flex-col items-center gap-2 mt-2">
-                                     <img src={`data:image/jpeg;base64,${props.hero.base64}`} alt="Hero" className="w-24 h-24 object-cover border-2 border-black rotate-[-2deg] shadow-sm" />
-                                     
-                                     {props.hero.name && (
-                                         <div className="bg-yellow-100 p-2 border border-black w-full text-left rotate-1">
-                                             <p className="font-comic text-lg leading-none">{props.hero.name}</p>
-                                             <p className="font-sans text-[10px] leading-tight text-gray-600 line-clamp-3">{props.hero.backstory}</p>
-                                         </div>
-                                     )}
-
-                                     <div className="flex w-full gap-2">
-                                        <label className="cursor-pointer comic-btn bg-yellow-400 text-black text-xs px-2 py-2 hover:bg-yellow-300 flex-1 text-center" onClick={playClick}>
-                                            UPLOAD
-                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { playClick(); e.target.files?.[0] && props.onHeroUpload(e.target.files[0]); }} />
-                                        </label>
-                                        <button className="comic-btn bg-white text-black text-xs px-2 py-2 hover:bg-gray-100 flex-1 text-center" onClick={() => { playClick(); props.onAutoGenerateHero(); }}>
-                                            REGENERATE
-                                        </button>
-                                     </div>
-                                </div>
-                            ) : (
-                                <label className="comic-btn bg-blue-500 text-white text-lg px-3 py-6 block w-full hover:bg-blue-400 cursor-pointer text-center h-full flex items-center justify-center" onClick={playClick}>
-                                    UPLOAD HERO 
-                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { playClick(); e.target.files?.[0] && props.onHeroUpload(e.target.files[0]); }} />
-                                </label>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* COL 2: SUPPORTING CAST */}
-                    <div className="flex flex-col gap-3">
-                        <div className="font-comic text-xl text-black border-b-4 border-black mb-1">2. THE CAST</div>
-                        
-                        <div className={`p-2 border-2 border-dashed ${props.friend ? 'border-green-500 bg-green-50' : 'border-purple-300 bg-purple-50'}`}>
-                            <div className="flex justify-between items-center">
-                                <p className="font-comic text-sm uppercase font-bold text-purple-900">CO-STAR (OPTIONAL)</p>
-                                <div className="flex gap-1">
-                                    {!props.friend && (
-                                        <button onClick={() => { playClick(); props.onAutoGenerateFriend(); }} className="text-[10px] font-bold bg-black text-white px-2 py-1 hover:bg-gray-800 border border-transparent uppercase">
-                                            AUTO
-                                        </button>
-                                    )}
-                                    <label className="text-[10px] font-bold bg-purple-200 px-2 py-1 border border-black cursor-pointer hover:bg-purple-100 flex items-center" onClick={playClick}>
-                                        {props.friend ? 'CHANGE' : 'UPLOAD'}
-                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => props.onFriendUpload(e.target.files![0])} />
-                                    </label>
-                                </div>
-                            </div>
-                            {props.friend && (
-                                <div className="flex flex-col gap-1 mt-1">
-                                    <div className="flex items-center gap-2">
-                                        <img src={`data:image/jpeg;base64,${props.friend.base64}`} className="w-10 h-10 object-cover border border-black" alt="Friend"/>
-                                        <button onClick={() => { playClick(); props.onAutoGenerateFriend(); }} className="text-[10px] underline text-gray-500 hover:text-black">Regenerate</button>
-                                    </div>
-                                    {props.friend.name && (
-                                        <div className="bg-white p-1 border border-gray-300">
-                                             <p className="font-comic text-xs font-bold">{props.friend.name}</p>
-                                             <p className="font-sans text-[8px] leading-tight text-gray-600 line-clamp-2">{props.friend.backstory}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                         <div className={`p-2 border-2 border-dashed ${props.villain ? 'border-red-500 bg-red-50' : 'border-gray-400 bg-gray-50'} flex flex-col gap-1`}>
-                            <div className="flex justify-between items-center">
-                                <p className="font-comic text-sm uppercase font-bold text-red-900">THE VILLAIN</p>
-                                {props.villain ? (
-                                     <span className="text-[10px] font-bold text-green-600">✓ READY</span>
-                                ) : (
-                                     <button onClick={() => { playClick(); props.onAutoGenerateVillain(); }} className="text-[10px] font-bold bg-black text-white px-2 py-1 hover:bg-gray-800 border border-transparent">
-                                        AUTO-GENERATE
-                                     </button>
-                                )}
-                            </div>
-                            {props.villain ? (
-                                <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-2">
-                                        <img src={`data:image/jpeg;base64,${props.villain.base64}`} className="w-12 h-12 object-cover border border-black" alt="Villain"/>
-                                        <button onClick={() => { playClick(); props.onAutoGenerateVillain(); }} className="text-[10px] underline text-gray-500 hover:text-black">Regenerate</button>
-                                    </div>
-                                    {props.villain.name && (
-                                        <div className="bg-white p-1 border border-gray-300">
-                                             <p className="font-comic text-xs font-bold">{props.villain.name}</p>
-                                             <p className="font-sans text-[8px] leading-tight text-gray-600 line-clamp-2">{props.villain.backstory}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <label className="text-[10px] text-center text-gray-400 cursor-pointer hover:text-black block w-full border border-gray-200 bg-white py-1">
-                                    OR UPLOAD IMAGE
-                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { playClick(); e.target.files?.[0] && props.onVillainUpload(e.target.files[0]); }} />
-                                </label>
-                            )}
-                        </div>
-
+                         <CharacterUploader 
+                            title="3. THE VILLAIN"
+                            role="OPTIONAL THREAT"
+                            colorClass="bg-red-50"
+                            borderColor="border-red-500"
+                            textColor="text-red-900"
+                            persona={props.villain}
+                            onUpload={props.onVillainUpload}
+                            onAutoGenerate={props.onAutoGenerateVillain}
+                        />
                         <button onClick={() => { playClick(); props.onGenerateBios(); }} 
                                 className="comic-btn bg-white text-black text-sm px-4 py-2 hover:bg-gray-100 flex items-center justify-center gap-2 mt-auto"
                                 disabled={!props.hero}>
@@ -257,48 +332,49 @@ export const Setup: React.FC<SetupProps> = (props) => {
                         </button>
                     </div>
 
-                    {/* COL 3: SETTINGS */}
-                    <div className="flex flex-col gap-3">
-                        <div className="font-comic text-xl text-black border-b-4 border-black mb-1">3. THE WORLD</div>
-                        
-                        <div className="bg-yellow-50 p-3 border-4 border-black h-full flex flex-col gap-3">
-                            <div>
-                                <p className="font-comic text-sm mb-1 font-bold text-gray-800">GENRE</p>
-                                <select value={props.selectedGenre} onChange={(e) => { playClick(); props.onGenreChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm">
-                                    {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
-                                </select>
-                            </div>
-
-                            <div>
-                                <p className="font-comic text-sm mb-1 font-bold text-gray-800">ART STYLE (Filtered by Genre)</p>
-                                <select value={props.selectedArtStyle} onChange={(e) => { playClick(); props.onArtStyleChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm">
-                                    {filteredStyles.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                            </div>
-
-                            <div>
-                                <p className="font-comic text-sm mb-1 font-bold text-gray-800">LANGUAGE</p>
-                                <select value={props.selectedLanguage} onChange={(e) => { playClick(); props.onLanguageChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm">
-                                    {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
-                                </select>
-                            </div>
-
-                            <div>
-                                <p className="font-comic text-sm mb-1 font-bold text-gray-800">STORY TONE</p>
-                                <select value={props.selectedTone} onChange={(e) => { playClick(); props.onToneChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm">
-                                    {TONES.map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
-                            </div>
-
-                            {props.selectedGenre === 'Custom' && (
-                                <textarea value={props.customPremise} onChange={(e) => props.onPremiseChange(e.target.value)} placeholder="Story Premise..." className="w-full p-1 border-2 border-black font-comic text-sm h-12 resize-none" />
-                            )}
-                            
-                            <label className="flex items-center gap-2 font-comic text-sm cursor-pointer mt-auto hover:bg-yellow-200 p-1 rounded transition-colors" onClick={playClick}>
-                                <input type="checkbox" checked={props.richMode} onChange={(e) => props.onRichModeChange(e.target.checked)} className="w-4 h-4 accent-black" />
-                                <span>NOVEL MODE (Rich Text)</span>
-                            </label>
-                        </div>
+                    {/* COL 4 (Actually 3 in grid but handled by layout): SETTINGS */}
+                </div>
+                
+                {/* SETTINGS AREA */}
+                <div className="mb-6 p-4 bg-yellow-50 border-4 border-black text-left grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                     <div>
+                        <label htmlFor="genre-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">GENRE</label>
+                        <select id="genre-select" value={props.selectedGenre} onChange={(e) => { playClick(); props.onGenreChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                            {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="style-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">ART STYLE</label>
+                        <select id="style-select" value={props.selectedArtStyle} onChange={(e) => { playClick(); props.onArtStyleChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                            {filteredStyles.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="lang-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">LANGUAGE</label>
+                        <select id="lang-select" value={props.selectedLanguage} onChange={(e) => { playClick(); props.onLanguageChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                            {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="layout-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">LAYOUT</label>
+                        <select id="layout-select" value={props.selectedLayout} onChange={(e) => { playClick(); props.onLayoutChange(e.target.value as PanelLayout); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                            {PANEL_LAYOUTS.map(l => <option key={l} value={l}>{l.replace('_', ' ').toUpperCase()}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex flex-col lg:col-span-2">
+                        <label htmlFor="tone-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">STORY TONE</label>
+                        <select id="tone-select" value={props.selectedTone} onChange={(e) => { playClick(); props.onToneChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                            {TONES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        {props.selectedGenre === 'Custom' && (
+                            <textarea 
+                                value={props.customPremise} 
+                                onChange={(e) => props.onPremiseChange(e.target.value)} 
+                                placeholder="Story Premise..." 
+                                className="w-full p-1 border-2 border-black font-comic text-sm h-12 resize-none mt-2 focus:outline-none focus:ring-4 focus:ring-yellow-400" 
+                                aria-label="Custom Story Premise"
+                            />
+                        )}
                     </div>
                 </div>
 

@@ -2,37 +2,26 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
- * 
- * Service layer for interacting with Google GenAI.
- * Handles Text, Image, Video, and Audio generation.
  */
 
 import { GoogleGenAI, GenerateContentResponse, Modality } from '@google/genai';
-import { ComicFace, Beat, Persona, LetterItem, MAX_STORY_PAGES, WorldState, Bubble } from './types';
+import { ComicFace, Beat, Persona, LetterItem, MAX_STORY_PAGES, WorldState, Bubble, PanelLayout } from './types';
 
-// --- Model Constants ---
 const MODEL_IMAGE_GEN_NAME = "gemini-3-pro-image-preview";
 const MODEL_IMAGE_EDIT_NAME = "gemini-2.5-flash-image"; 
 const MODEL_TEXT_NAME = "gemini-3-pro-preview";         
 const MODEL_TTS_NAME = "gemini-2.5-flash-preview-tts";
 const MODEL_VEO = 'veo-3.1-fast-generate-preview';      
+const MODEL_VISION_NAME = 'gemini-3-flash-preview';
 
-/**
- * Executes an async function with exponential backoff retry logic.
- */
 export const callWithRetry = async <T,>(fn: () => Promise<T>, retries = 3, initialDelay = 2000): Promise<T> => {
     let lastError;
     for (let i = 0; i < retries; i++) {
-        try {
-            return await fn();
-        } catch (e: any) {
+        try { return await fn(); } catch (e: any) {
             lastError = e;
             const msg = JSON.stringify(e) + String(e);
-            const isOverloaded = msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE');
-            
-            if (isOverloaded && i < retries - 1) {
+            if ((msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE')) && i < retries - 1) {
                 const delay = initialDelay * Math.pow(2, i);
-                console.warn(`Model overloaded. Retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
                 continue;
             }
@@ -42,23 +31,14 @@ export const callWithRetry = async <T,>(fn: () => Promise<T>, retries = 3, initi
     throw lastError;
 };
 
-export const getGenreKeywords = (genre: string): string => {
-    switch (genre) {
-        case "Classic Horror": return "Gothic, macabre, Victorian attire, eerie lighting, shadow-heavy.";
-        case "Superhero Action": return "Iconic spandex costume, muscular, heroic stance, bright primary colors.";
-        case "Dark Sci-Fi": return "Cybernetic enhancements, visor, tactical heavy armor, weathered metal.";
-        case "High Fantasy": return "Mythical plate armor, enchanted glowing weapons, ornate leather.";
-        case "Neon Noir Detective": return "Classic trench coat, glowing neon accents, rainy atmosphere.";
-        case "Wasteland Apocalypse": return "Rugged scavenged gear, desert goggles, spiked armor, dusty textures.";
-        default: return "Distinctive clothing, clear silhouette.";
+const getAI = () => {
+    const key = localStorage.getItem('gemini_api_key') || process.env.API_KEY;
+    if (!key) {
+        throw new Error("API_KEY_INVALID: Please enter a valid API Key in settings.");
     }
+    return new GoogleGenAI({ apiKey: key });
 };
 
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-/**
- * Generates audio for a specific line of dialogue.
- */
 export const generateTTS = async (text: string, voiceName: string): Promise<string | undefined> => {
     const ai = getAI();
     const response = await ai.models.generateContent({
@@ -72,330 +52,140 @@ export const generateTTS = async (text: string, voiceName: string): Promise<stri
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 };
 
-/**
- * Generates a response from a specific character persona.
- */
-export const generateCharacterResponse = async (
-    persona: Persona,
-    role: string,
-    userMessage: string,
-    currentScene: string,
-    genre: string,
-    langName: string
-): Promise<string> => {
-    const prompt = `
-You are ${persona.name}, the ${role} of a ${genre} comic book.
-Your Backstory: ${persona.backstory}
-
-The current scene in the story is: "${currentScene}"
-A reader is speaking to you directly or giving you a command.
-
-Reader's message: "${userMessage}"
-
-INSTRUCTIONS:
-1. Respond purely in character. 
-2. Use the tone appropriate for your genre and backstory.
-3. Keep it relatively brief, like a comic book speech bubble (under 50 words).
-4. Respond in ${langName}.
-
-ONLY return the text of your response.
-`;
-
+export const generateCharacterResponse = async (persona: Persona, role: string, userMessage: string, currentScene: string, genre: string, langName: string): Promise<string> => {
+    const prompt = `You are ${persona.name}, ${role} of a ${genre} comic. Role: ${persona.backstory}. Scene: ${currentScene}. Message: ${userMessage}. Language: ${langName}. Short response.`;
     const ai = getAI();
-    const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-        model: MODEL_TEXT_NAME,
-        contents: prompt
-    }));
-    return res.text || "I have nothing to say to you, mortal.";
+    const res = await ai.models.generateContent({ model: MODEL_TEXT_NAME, contents: prompt });
+    return res.text || "...";
 };
 
 export const generateLetters = async (history: ComicFace[], langName: string): Promise<LetterItem[]> => {
-    const summary = history.filter(h => h.narrative).map(h => `Page ${h.pageIndex}: ${h.narrative?.scene}`).join('\n');
-    const prompt = `Story Summary: ${summary}. Write 3 fictional fan letters in ${langName} from passionate comic fans. JSON: [{user, location, text, sentiment}]`;
+    const prompt = `Generate 3 fictional fan letters in ${langName} based on a comic. JSON: [{user, location, text, sentiment}]`;
     const ai = getAI();
-    const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({ 
-        model: MODEL_TEXT_NAME, contents: prompt, config: { responseMimeType: 'application/json' } 
-    }));
-    const rawText = res.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "[]";
-    return JSON.parse(rawText);
+    const res = await ai.models.generateContent({ model: MODEL_TEXT_NAME, contents: prompt, config: { responseMimeType: 'application/json' } });
+    return JSON.parse(res.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "[]");
 };
 
 export const generateCharacterBios = async (genre: string, tone: string, langName: string, hasFriend: boolean, hasVillain: boolean) => {
-    const prompt = `
-    GENRE: ${genre}. 
-    TONE: ${tone}. 
-    LANGUAGE: ${langName}.
-    
-    INSTRUCTIONS:
-    Generate detailed JSON dossiers for the following characters:
-    1. Hero (Required)
-    ${hasFriend ? '2. Friend/Sidekick (Required)' : ''}
-    ${hasVillain ? '3. Villain/Antagonist (Required)' : ''}
-    
-    For each character, provide:
-    - 'name': A creative, genre-appropriate name.
-    - 'backstory': A detailed biography (approx 50-80 words) focusing on their dramatic motivations, secrets, and unique quirks that fit the ${genre} setting.
-
-    RETURN JSON FORMAT:
-    {
-      "hero": { "name": "...", "backstory": "..." },
-      "friend": { "name": "...", "backstory": "..." }, // Optional if not requested
-      "villain": { "name": "...", "backstory": "..." } // Optional if not requested
-    }
-    `;
+    const prompt = `Genre: ${genre}. Tone: ${tone}. Language: ${langName}. Detailed JSON dossiers for Hero${hasFriend?', Ally':''}${hasVillain?', Villain':''}. Format: {hero: {name, backstory}, ...}`;
     const ai = getAI();
-    const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({ 
-        model: MODEL_TEXT_NAME, contents: prompt, config: { responseMimeType: 'application/json' } 
-    }));
+    const res = await ai.models.generateContent({ model: MODEL_TEXT_NAME, contents: prompt, config: { responseMimeType: 'application/json' } });
     return JSON.parse(res.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "{}");
 };
 
-export const generateBeat = async (
-    pageNum: number, 
-    history: ComicFace[], 
-    hero: Persona, 
-    friend: Persona | null, 
-    villain: Persona | null,
-    genre: string,
-    tone: string,
-    langName: string,
-    customPremise: string,
-    richMode: boolean,
-    isDecisionPage: boolean,
-    worldState: WorldState
-): Promise<Beat> => {
-    
-    const lastPage = history.filter(p => p.type === 'story').pop();
-    const recentChoice = lastPage?.resolvedChoice;
-
-    let inventoryStr = worldState.inventory.length ? `INVENTORY: ${worldState.inventory.join(', ')}.` : "INVENTORY: Empty.";
-    let statusStr = worldState.status.length ? `STATUS: ${worldState.status.join(', ')}.` : "STATUS: Healthy.";
-    
-    let charInfo = `HERO: ${hero.name}`;
-    if (hero.backstory) charInfo += ` (Persona: ${hero.backstory})`;
-    
-    if (friend) {
-        charInfo += `\nALLY: ${friend.name}`;
-        if (friend.backstory) charInfo += ` (Persona: ${friend.backstory})`;
-    }
-    if (villain) {
-        charInfo += `\nVILLAIN: ${villain.name}`;
-        if (villain.backstory) charInfo += ` (Persona: ${villain.backstory})`;
-    }
-
-    // Increased context window to 5 panels
-    const recentPanels = history
-        .filter(p => p.type === 'story' && p.bubbles && p.bubbles.length > 0)
-        .slice(-5);
-        
-    let dialogueHistory = "";
-    if (recentPanels.length > 0) {
-        dialogueHistory = "\nRECENT CONVERSATION HISTORY (Last 5 Panels):\n";
-        recentPanels.forEach(p => {
-             dialogueHistory += `[Page ${p.pageIndex}]\n`;
-             p.bubbles?.forEach(b => {
-                 if (b.type === 'speech' || b.type === 'thought') {
-                     const speaker = b.character || "NARRATOR";
-                     dialogueHistory += `  ${speaker}: "${b.text}"\n`;
-                 }
-             });
-        });
-    }
-
-    const prompt = `
-You are a master comic book scriptwriter. This is Page ${pageNum} of ${MAX_STORY_PAGES}.
-GENRE: ${genre}. TONE: ${tone}.
-LANGUAGE: ${langName}.
-
-WORLD STATE:
-${inventoryStr}
-${statusStr}
-
-CHARACTERS:
-${charInfo}
-
-${dialogueHistory}
-
-PREVIOUS PLOT POINT: "${lastPage?.narrative?.scene || 'The story begins...'}"
-USER DECISION: "${recentChoice || 'N/A'}"
-
-INSTRUCTIONS:
-1. Advance the plot logically based on the USER DECISION.
-2. Maintain STRICT DIALOGUE CONTINUITY. New speech bubbles must feel like a direct response to the RECENT CONVERSATION HISTORY. Consider the flow across the last 5 panels.
-3. Update WORLD STATE if the hero finds an item or gets injured.
-4. Ensure character voices are distinct and consistent with their personas.
-5. Generate DIALOGUE BUBBLES separated from the art description.
-   **CRITICAL: SCENE DESCRIPTION must be VISUAL only. DO NOT include any text, speech bubbles, letters, or words within the image description itself.**
-   **The image must be CLEAN and TEXT-FREE. All dialogue will be overlayed separately.**
-
-RETURN JSON:
-{
-  "scene": "Cinematic visual description. NO TEXT in image.",
-  "focus_char": "hero"|"friend"|"villain"|"other",
-  "bubbles": [
-     { "id": "1", "text": "Dialogue...", "type": "speech"|"caption"|"thought"|"sfx", "character": "Name", "x": 50, "y": 10 }
-  ],
-  "world_update": {
-      "add_items": ["Item Name"],
-      "remove_items": ["Item Name"],
-      "add_status": ["Status"],
-      "remove_status": ["Status"]
-  },
-  "choices": ["Next Option A", "Next Option B"]
-}
-`;
-
+export const generateItemIcon = async (itemName: string, genre: string): Promise<string> => {
     const ai = getAI();
-    const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({ 
-        model: MODEL_TEXT_NAME, 
-        contents: prompt, 
-        config: { responseMimeType: 'application/json' } 
-    }));
-    
-    let rawText = res.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "{}";
-    const parsed = JSON.parse(rawText);
-    
-    if (!parsed.bubbles) parsed.bubbles = [];
-    if (!parsed.world_update) parsed.world_update = {};
-    if (!parsed.choices) parsed.choices = [];
-    if (isDecisionPage && parsed.choices.length < 2) parsed.choices = ["Push Forward", "Wait and See"];
-    
-    return parsed as Beat;
+    const res = await ai.models.generateContent({
+        model: MODEL_IMAGE_GEN_NAME,
+        contents: { parts: [{ text: `Pixel art icon for ${itemName} in a ${genre} world. White background.` }] },
+        config: { imageConfig: { aspectRatio: '1:1' } }
+    });
+    const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+    return part?.inlineData?.data ? `data:image/png;base64,${part.inlineData.data}` : '';
 };
 
-export const reviseBeat = async (
-    currentBeat: Beat,
-    instruction: string
+export const generateBeat = async (
+    pageNum: number, history: ComicFace[], hero: Persona, friend: Persona | null, villain: Persona | null, 
+    genre: string, tone: string, langName: string, customPremise: string, richMode: boolean, isDecisionPage: boolean, worldState: WorldState,
+    rollResult?: { value: number, isSuccess: boolean },
+    preferredLayout?: PanelLayout
 ): Promise<Beat> => {
+    const lastPage = history[history.length - 1];
     const prompt = `
-You are a comic book editor revising a script.
-Current Panel Data:
-${JSON.stringify(currentBeat, null, 2)}
+Advance ${genre} comic (Page ${pageNum}). Tone: ${tone}. Lang: ${langName}.
+CHARS: Hero(${hero.name}), Ally(${friend?.name}), Villain(${villain?.name}).
+WORLD: Health(${worldState.health}%), Inv(${worldState.inventory.map(i=>i.name).join(', ')}), NPCs(${worldState.npcs.map(n=>n.name).join(', ')}).
+ROLL: ${rollResult ? `Roll ${rollResult.value} (${rollResult.isSuccess?'Success':'Fail'})` : 'None'}.
+ACTION: ${lastPage?.resolvedChoice}.
 
-User Instruction: "${instruction}"
+INSTRUCTIONS:
+1. Advance story. 2. Track World State. 3. Update Health (delta -20 to +20).
+4. Discover new NPCs if applicable. 5. Trigger Achievements if applicable.
+${preferredLayout ? `6. PREFERRED LAYOUT: ${preferredLayout}` : ''}
 
-Task: Rewrite the 'scene', 'bubbles', and 'choices' (if applicable) based on the instruction while keeping the overall story arc consistent.
-Keep the JSON structure exactly the same.
-Ensure 'scene' is a visual description.
-Ensure 'bubbles' has 'id', 'text', 'type', 'x', 'y'.
-**CRITICAL: The scene must remain TEXT-FREE and CLEAN of any words or baked-in bubbles.**
-
-RETURN JSON ONLY.
+JSON:
+{
+  "layout": "single" | "2_vertical" | "2x2_grid",
+  "panels": [{ "description": "Scene", "bubbles": [{ "text": "...", "character": "...", "type": "speech" }] }],
+  "world_update": { 
+     "health_delta": number, "add_items": [], "remove_items": [], 
+     "new_npcs": [{"name": "...", "backstory": "..."}],
+     "achievement_id": "risky_roller" | "first_choice" | "survivor" | null
+  },
+  "choices": ["...", "..."]
+}
 `;
-
     const ai = getAI();
-    const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-        model: MODEL_TEXT_NAME,
-        contents: prompt,
-        config: { responseMimeType: 'application/json' }
-    }));
+    const res = await ai.models.generateContent({ model: MODEL_TEXT_NAME, contents: prompt, config: { responseMimeType: 'application/json' } });
+    return JSON.parse(res.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "{}") as Beat;
+};
 
-    let rawText = res.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "{}";
-    const parsed = JSON.parse(rawText);
-    return parsed as Beat;
+export const reviseBeat = async (currentBeat: Beat, instruction: string): Promise<Beat> => {
+    const prompt = `Revise JSON script: ${instruction}. Original: ${JSON.stringify(currentBeat)}`;
+    const ai = getAI();
+    const res = await ai.models.generateContent({ model: MODEL_TEXT_NAME, contents: prompt, config: { responseMimeType: 'application/json' } });
+    return JSON.parse(res.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "{}") as Beat;
 };
 
 export const generatePersona = async (desc: string, artStyle: string, genre: string): Promise<Persona> => {
     const ai = getAI();
-    const keywords = getGenreKeywords(genre);
-    const promptText = `Full body concept art of ${desc} in a ${genre} setting. 
-    Visual cues: ${keywords}. 
-    Art Style: ${artStyle}. 
-    Neutral background, no text, character design sheet quality.`;
-
-    const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
+    const res = await ai.models.generateContent({
         model: MODEL_IMAGE_GEN_NAME,
-        contents: { parts: [{ text: promptText }] },
+        contents: { parts: [{ text: `Character sheet: ${desc}. Style: ${artStyle}. No text, neutral background.` }] },
         config: { imageConfig: { aspectRatio: '1:1' } }
-    }));
+    });
     const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    if (part?.inlineData?.data) return { base64: part.inlineData.data, desc };
-    throw new Error("Persona failed");
+    if (!part?.inlineData?.data) throw new Error("Persona failed");
+    return { base64: part.inlineData.data, desc };
 };
 
-export const generateImage = async (
-    beat: Beat, 
-    type: ComicFace['type'], 
-    artStyle: string, 
-    genre: string, 
-    langName: string,
-    hero: Persona | null,
-    friend: Persona | null,
-    villain: Persona | null,
-    worldState: WorldState
-): Promise<string> => {
+export const describeCharacter = async (base64: string): Promise<string> => {
+    const ai = getAI();
+    const res = await ai.models.generateContent({
+        model: MODEL_VISION_NAME,
+        contents: {
+            parts: [
+                { inlineData: { mimeType: 'image/jpeg', data: base64 } },
+                { text: "Describe this character's physical appearance in detail for a comic book artist. Focus on clothing, face, and distinctive features." }
+            ]
+        }
+    });
+    return res.text || "A mysterious character.";
+};
+
+export const generateImage = async (panelDesc: string, artStyle: string, genre: string, hero: Persona | null, friend: Persona | null, villain: Persona | null, worldState: WorldState, aspectRatio: string = '1:1'): Promise<string> => {
     const parts = [];
-    if (hero?.base64) parts.push({ text: "Visual Reference [HERO]:" }, { inlineData: { mimeType: 'image/jpeg', data: hero.base64 } });
-    if (friend?.base64) parts.push({ text: "Visual Reference [ALLY]:" }, { inlineData: { mimeType: 'image/jpeg', data: friend.base64 } });
-    if (villain?.base64) parts.push({ text: "Visual Reference [VILLAIN]:" }, { inlineData: { mimeType: 'image/jpeg', data: villain.base64 } });
-
-    let contextPrompt = "";
-    if (worldState.inventory.length > 0) contextPrompt += ` The hero is currently using: ${worldState.inventory.join(', ')}.`;
-    if (worldState.status.length > 0) contextPrompt += ` Character visual state: ${worldState.status.join(', ')}.`;
-
-    let promptText = `ART STYLE: ${artStyle}. GENRE: ${genre}. ${contextPrompt}`;
-    
-    if (type === 'cover') {
-        promptText += ` HIGH-END COMIC COVER ART. Dynamic cinematic lighting, epic composition. CLEAN ART. NO TEXT, NO SPEECH BUBBLES.`;
-    } else {
-        promptText += ` SCENE: ${beat.scene}. **MANDATORY: NO TEXT, NO SPEECH BUBBLES, NO WORDS, NO LETTERS.** ONLY THE VISUAL ACTION.`;
-    }
-
-    parts.push({ text: promptText });
-
+    if (hero?.base64) parts.push({ text: "Ref Hero:" }, { inlineData: { mimeType: 'image/jpeg', data: hero.base64 } });
+    const prompt = `Style: ${artStyle}. Genre: ${genre}. Scene: ${panelDesc}. NO TEXT.`;
+    parts.push({ text: prompt });
     const ai = getAI();
-    const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-      model: MODEL_IMAGE_GEN_NAME,
-      contents: { parts },
-      config: { imageConfig: { aspectRatio: '3:4' } }
-    }));
+    const res = await ai.models.generateContent({ model: MODEL_IMAGE_GEN_NAME, contents: { parts }, config: { imageConfig: { aspectRatio } } });
     const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    if (part?.inlineData?.data) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-    return '';
+    return part?.inlineData?.data ? `data:image/png;base64,${part.inlineData.data}` : '';
 };
 
-export const editImage = async (
-    originalBase64: string,
-    instruction: string
-): Promise<string> => {
+export const editImage = async (originalBase64: string, instruction: string): Promise<string> => {
     const ai = getAI();
-    const parts = [
-        { inlineData: { mimeType: 'image/jpeg', data: originalBase64 } },
-        { text: `${instruction}. MAINTAIN TEXT-FREE CLEAN ART. NO SPEECH BUBBLES.` }
-    ];
-
-    const res = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-        model: MODEL_IMAGE_EDIT_NAME,
-        contents: { parts }
-    }));
-    
+    const parts = [{ inlineData: { mimeType: 'image/jpeg', data: originalBase64 } }, { text: `${instruction}. NO TEXT.` }];
+    const res = await ai.models.generateContent({ model: MODEL_IMAGE_EDIT_NAME, contents: { parts } });
     const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    if (part?.inlineData?.data) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-    throw new Error("Edit failed");
+    return part?.inlineData?.data ? `data:image/png;base64,${part.inlineData.data}` : '';
 };
 
 export const generateVeoVideo = async (base64Data: string, sceneDescription: string, isCover: boolean): Promise<string> => {
     const ai = getAI();
-    let veoprompt = `Motion comic style, subtle parallax animation, 4k, ${sceneDescription}. NO TEXT.`;
-    if (isCover) veoprompt = "Cinematic slow-motion comic cover, breathing life into the characters, epic mood lighting, 4k. NO TEXT.";
-
-    let operation = await callWithRetry<any>(() => ai.models.generateVideos({
+    let operation = await ai.models.generateVideos({
         model: MODEL_VEO,
         image: { imageBytes: base64Data, mimeType: 'image/jpeg' },
-        prompt: veoprompt,
+        prompt: `Motion comic of ${sceneDescription}`,
         config: { numberOfVideos: 1, resolution: '720p', aspectRatio: '9:16' }
-    }));
-    
+    });
     while (!operation.done) {
-        await new Promise(r => setTimeout(r, 4000));
-        operation = await callWithRetry<any>(() => ai.operations.getVideosOperation({ operation }));
+        await new Promise(r => setTimeout(r, 5000));
+        operation = await ai.operations.getVideosOperation({ operation });
     }
-    
     const uri = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (uri) {
-        const vidRes = await fetch(`${uri}&key=${process.env.API_KEY}`);
-        const blob = await vidRes.blob();
-        return URL.createObjectURL(blob);
-    }
-    throw new Error("No video");
+    const vidRes = await fetch(`${uri}&key=${localStorage.getItem('gemini_api_key') || process.env.API_KEY}`);
+    const blob = await vidRes.blob();
+    return URL.createObjectURL(blob);
 };

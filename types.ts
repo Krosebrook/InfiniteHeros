@@ -58,10 +58,30 @@ export const LANGUAGES = [
     { code: 'ar-EG', name: 'Arabic (Egypt)' }
 ];
 
+export const ASPECT_RATIOS = ["1:1", "3:4", "4:3", "16:9", "9:16"];
+
+export const PANEL_LAYOUTS: PanelLayout[] = ['single', '2_vertical', '2x2_grid', '3_hybrid'];
+
+export interface InventoryItem {
+    name: string;
+    iconUrl?: string;
+    description?: string;
+}
+
+export interface Achievement {
+    id: string;
+    title: string;
+    description: string;
+    unlocked: boolean;
+}
+
 export interface WorldState {
-    inventory: string[];
-    status: string[]; // e.g., "Injured Leg", "Cursed"
+    inventory: InventoryItem[];
+    status: string[];
     location_tags: string[];
+    health: number; // 0 to 100
+    npcs: Persona[];
+    achievements: Achievement[];
 }
 
 export interface Bubble {
@@ -69,13 +89,28 @@ export interface Bubble {
     text: string;
     type: 'speech' | 'thought' | 'caption' | 'sfx';
     character?: string;
-    x: number; // Percent 0-100
-    y: number; // Percent 0-100
+    x: number; // Percent 0-100 relative to PAGE
+    y: number; // Percent 0-100 relative to PAGE
+    tailX?: number; // Relative to bubble center
+    tailY?: number; 
+    panelIndex?: number;
+}
+
+export type PanelLayout = 'single' | '2_vertical' | '2x2_grid' | '3_hybrid';
+
+export interface ComicPanelData {
+    id: string;
+    imageUrl?: string;
+    videoUrl?: string;
+    description: string;
+    maskUrl?: string; // For in-painting
 }
 
 export interface ComicFace {
   id: string;
   type: 'cover' | 'story' | 'letters' | 'back_cover';
+  layout: PanelLayout;
+  panels: ComicPanelData[];
   imageUrl?: string;
   videoUrl?: string;
   narrative?: Beat;
@@ -87,9 +122,9 @@ export interface ComicFace {
   isDecisionPage?: boolean;
   lettersContent?: LetterItem[];
   bubbles?: Bubble[]; 
-  // Graph Fields
   parentId?: string;
-  choiceLabel?: string; // The choice that led to this node from parent
+  choiceLabel?: string; 
+  rollResult?: { value: number, isSuccess: boolean };
 }
 
 export interface LetterItem {
@@ -100,15 +135,18 @@ export interface LetterItem {
 }
 
 export interface Beat {
-  scene: string;
+  layout: PanelLayout;
+  panels: { description: string, bubbles: Bubble[] }[];
   choices: string[];
   focus_char: 'hero' | 'friend' | 'villain' | 'other';
-  bubbles: Bubble[]; 
   world_update?: {
       add_items?: string[];
       remove_items?: string[];
       add_status?: string[];
       remove_status?: string[];
+      health_delta?: number;
+      new_npcs?: { name: string, backstory: string }[];
+      achievement_id?: string;
   };
 }
 
@@ -121,8 +159,8 @@ export interface Persona {
 
 export interface TTSSettings {
     autoPlay: boolean;
-    defaultVoice: string; // Used for 'other' or narrator
-    playbackSpeed: number; // 0.5 to 2.0
+    defaultVoice: string; 
+    playbackSpeed: number; 
 }
 
 export interface GameState {
@@ -130,13 +168,14 @@ export interface GameState {
   friend: Persona | null;
   villain: Persona | null;
   comicFaces: ComicFace[];
-  storyTree?: Record<string, ComicFace>; // Full history
+  storyTree?: Record<string, ComicFace>; 
   currentSheetIndex: number;
   isStarted: boolean;
   selectedGenre: string;
   selectedArtStyle: string;
   selectedLanguage: string;
   storyTone: string;
+  selectedLayout?: PanelLayout;
   timestamp: number;
   worldState: WorldState;
   ttsSettings?: TTSSettings;

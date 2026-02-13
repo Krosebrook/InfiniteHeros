@@ -4,6 +4,19 @@
   Ensures legible, aesthetic, and dynamic speech bubbles.
 */
 
+:root {
+  --focus-color: #FACC15; /* Yellow-400 */
+}
+
+/* GLOBAL ACCESSIBILITY: Custom Focus Ring */
+*:focus-visible {
+    outline: 4px solid var(--focus-color);
+    outline-offset: 2px;
+    border-radius: 4px;
+    box-shadow: 0 0 0 6px black;
+    z-index: 50;
+}
+
 .comic-bubble-speech, .comic-bubble-thought, .comic-bubble-caption, .comic-bubble-sfx {
     min-width: 60px;
     max-width: 250px;
@@ -112,7 +125,7 @@
     box-shadow: 3px 3px 0 black;
 }
 
-.control-btn:hover {
+.control-btn:hover, .control-btn:focus-visible {
     transform: translate(-2px, -2px);
     box-shadow: 5px 5px 0 black;
 }

@@ -1,54 +1,90 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import {useCallback, useState} from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { GoogleGenAI } from '@google/genai';
 
-// Interface for the injected window.aistudio object
-interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
+interface ApiKeyContextType {
+  apiKey: string | null;
+  isValid: boolean;
+  saveApiKey: (key: string) => Promise<boolean>;
+  clearApiKey: () => void;
+  showDialog: boolean;
+  setShowDialog: (show: boolean) => void;
+  validateApiKey: () => Promise<boolean>;
 }
 
-export const useApiKey = () => {
-  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+const ApiKeyContext = createContext<ApiKeyContextType | undefined>(undefined);
 
-  const validateApiKey = useCallback(async (): Promise<boolean> => {
-    const aistudio = (window as any).aistudio as AIStudio | undefined;
-    
-    // If the environment supports key selection
-    if (aistudio) {
-      try {
-        // Check if key is already selected
-        const hasKey = await aistudio.hasSelectedApiKey();
-        if (!hasKey) {
-          setShowApiKeyDialog(true);
-          return false;
-        }
-      } catch (error) {
-        // Fallback if check fails
-        console.warn('API Key check failed', error);
-        setShowApiKeyDialog(true);
+export const ApiKeyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [apiKey, setApiKey] = useState<string | null>(localStorage.getItem('gemini_api_key'));
+  const [isValid, setIsValid] = useState<boolean>(false);
+  const [showDialog, setShowDialog] = useState(false);
+
+  useEffect(() => {
+    // Initial load check
+    const stored = localStorage.getItem('gemini_api_key');
+    const envKey = process.env.API_KEY;
+
+    if (stored) {
+        setApiKey(stored);
+        setIsValid(true); // Optimistic valid
+    } else if (envKey) {
+        setApiKey(envKey);
+        setIsValid(true);
+    } else {
+        setShowDialog(true);
+    }
+  }, []);
+
+  const saveApiKey = useCallback(async (key: string): Promise<boolean> => {
+    try {
+        // Validation Call
+        const ai = new GoogleGenAI({ apiKey: key });
+        // Lightweight check
+        await ai.models.generateContent({
+            model: 'gemini-3-flash-preview', 
+            contents: { parts: [{ text: 'Ping' }] }
+        });
+        
+        localStorage.setItem('gemini_api_key', key);
+        setApiKey(key);
+        setIsValid(true);
+        setShowDialog(false);
+        return true;
+    } catch (e) {
+        console.error("API Key Validation Failed", e);
         return false;
-      }
-    }
-    return true;
-  }, []);
-
-  const handleApiKeyDialogContinue = useCallback(async () => {
-    setShowApiKeyDialog(false);
-    const aistudio = (window as any).aistudio as AIStudio | undefined;
-    if (aistudio) {
-      await aistudio.openSelectKey();
     }
   }, []);
 
-  return {
-    showApiKeyDialog,
-    setShowApiKeyDialog, // Exposed in case you need to trigger it from API errors
-    validateApiKey,
-    handleApiKeyDialogContinue,
-  };
+  const clearApiKey = useCallback(() => {
+      localStorage.removeItem('gemini_api_key');
+      setApiKey(null);
+      setIsValid(false);
+      setShowDialog(true);
+  }, []);
+
+  // Helper for components to check validity and trigger dialog if needed
+  const validateApiKey = useCallback(async (): Promise<boolean> => {
+      if (isValid && apiKey) return true;
+      setShowDialog(true);
+      return false;
+  }, [isValid, apiKey]);
+
+  return React.createElement(
+    ApiKeyContext.Provider,
+    { value: { apiKey, isValid, saveApiKey, clearApiKey, showDialog, setShowDialog, validateApiKey } },
+    children
+  );
+};
+
+export const useApiKey = () => {
+  const context = useContext(ApiKeyContext);
+  if (!context) {
+    throw new Error('useApiKey must be used within an ApiKeyProvider');
+  }
+  return context;
 };
