@@ -124,6 +124,7 @@ const InfiniteHeroesGame: React.FC = () => {
     
     const [showBios, setShowBios] = useState(false);
     const [showMap, setShowMap] = useState(false);
+    const [showInventory, setShowInventory] = useState(false);
     const [showSetup, setShowSetup] = useState(true);
     const [showSettings, setShowSettings] = useState(false);
     const [showExport, setShowExport] = useState(false);
@@ -132,6 +133,33 @@ const InfiniteHeroesGame: React.FC = () => {
     
     const [activeChat, setActiveChat] = useState<{persona: Persona, role: string} | null>(null);
     const [isTransitioning, setIsTransitioning] = useState(false);
+
+    const pendingIcons = useRef<Set<string>>(new Set());
+
+    // Effect to generate missing icons for inventory items
+    useEffect(() => {
+        if (!isStarted) return;
+        
+        worldState.inventory.forEach(item => {
+            if (!item.iconUrl && !pendingIcons.current.has(item.name)) {
+                pendingIcons.current.add(item.name);
+                aiService.generateItemIcon(item.name, selectedGenre).then(icon => {
+                    if (icon) {
+                        setWorldState(prev => {
+                            const updatedInv = prev.inventory.map(i => 
+                                i.name === item.name ? { ...i, iconUrl: icon } : i
+                            );
+                            worldStateRef.current.inventory = updatedInv;
+                            return { ...prev, inventory: updatedInv };
+                        });
+                    }
+                    pendingIcons.current.delete(item.name);
+                }).catch(() => {
+                    pendingIcons.current.delete(item.name);
+                });
+            }
+        });
+    }, [worldState.inventory, isStarted, selectedGenre]);
 
     const heroRef = useRef<Persona | null>(null);
     const friendRef = useRef<Persona | null>(null);
@@ -165,6 +193,28 @@ const InfiniteHeroesGame: React.FC = () => {
             }
         });
     }, []);
+
+    const handleSaveProgress = useCallback(() => {
+        if (!isStarted) return;
+        soundManager.play('success');
+        saveGame({
+            hero: heroRef.current,
+            friend: friendRef.current,
+            villain: villainRef.current,
+            comicFaces: historyRef.current,
+            storyTree: storyTreeRef.current,
+            currentSheetIndex,
+            isStarted,
+            selectedGenre,
+            selectedArtStyle,
+            selectedLanguage,
+            storyTone,
+            selectedLayout,
+            timestamp: Date.now(),
+            worldState: worldStateRef.current,
+            ttsSettings: ttsSettings 
+        }).catch(e => console.error("Save failed", e));
+    }, [isStarted, currentSheetIndex, selectedGenre, selectedArtStyle, selectedLanguage, storyTone, selectedLayout, ttsSettings]);
 
     const triggerAutoSave = useCallback(() => {
         if (!isStarted) return;
@@ -448,6 +498,50 @@ const InfiniteHeroesGame: React.FC = () => {
         } finally { generatingPages.current.delete(pageNum); }
     };
 
+    const handleGenerateCover = async () => {
+        if (!hero || !(await validateApiKey())) return;
+        soundManager.play('magic');
+        
+        const coverFace = comicFaces.find(f => f.type === 'cover');
+        if (!coverFace) return;
+
+        setCurrentSheetIndex(0);
+        updateFaceState(coverFace.id, { isLoading: true });
+        
+        try {
+            const langName = LANGUAGES.find(l => l.code === selectedLanguage)?.name || "English";
+            const beat = await aiService.generateBeat(0, historyRef.current, hero, friend, villain, "Superhero Action", storyTone, langName, customPremise, richMode, false, worldStateRef.current, undefined, 'single');
+            
+            const panelPromises = beat.panels.map(async (p, i) => ({
+                id: `${coverFace.id}-p${i}`,
+                description: p.description,
+                imageUrl: await aiService.generateImage(p.description, "Painting (Alex Ross Style)", "Superhero Action", hero, friend, villain, worldStateRef.current, '3:4')
+            }));
+            const generatedPanels = await Promise.all(panelPromises);
+            
+            const allBubbles: any[] = [];
+            beat.panels.forEach((p, i) => {
+                 const bubbles = p.bubbles.map(b => ({ 
+                     ...b, 
+                     id: uuidv4(), 
+                     x: 50, y: 50, 
+                     tailX: 50, tailY: 80 
+                 })); 
+                 allBubbles.push(...bubbles);
+            });
+
+            updateFaceState(coverFace.id, { 
+                narrative: beat, 
+                panels: generatedPanels, 
+                bubbles: allBubbles,
+                isLoading: false 
+            });
+        } catch (e) {
+            handleAPIError(e);
+            updateFaceState(coverFace.id, { isLoading: false });
+        }
+    };
+
     const handleLaunch = async () => {
         if (!hero || !(await validateApiKey())) return;
         setIsTransitioning(true);
@@ -617,6 +711,7 @@ const InfiniteHeroesGame: React.FC = () => {
                 hero={hero} friend={friend} villain={villain}
                 worldState={worldState}
                 onOpenBio={() => setShowBios(true)}
+                onOpenInventory={() => setShowInventory(!showInventory)}
                 onSheetClick={idx => setCurrentSheetIndex(idx)}
                 onChoice={handleChoice}
                 onOpenBook={() => setCurrentSheetIndex(1)}
@@ -681,7 +776,13 @@ const InfiniteHeroesGame: React.FC = () => {
                     if (branchCount > 10) unlockAchievement('multiversalist');
                 }}
                 onOpenSettings={() => setShowSettings(true)}
+                onSaveProgress={handleSaveProgress}
+                onGenerateCover={handleGenerateCover}
             />
+
+            {isStarted && !showSetup && showInventory && (
+                <Inventory items={worldState.inventory} status={worldState.status} />
+            )}
 
             {historyRef.current.length > 2 && currentSheetIndex > 1 && !showSetup && (
                 <button 
@@ -706,9 +807,9 @@ const InfiniteHeroesGame: React.FC = () => {
                 }
                 setShowMap(false);
             }} />}
-            {showSettings && <TTSSettingsDialog settings={ttsSettings} achievements={worldState.achievements} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} />}
-            {showExport && <ExportDialog onClose={() => setShowExport(false)} onExport={handleExport} isExporting={isExporting} />}
-            {activeChat && <CharacterChatDialog persona={activeChat.persona} role={activeChat.role} onClose={() => setActiveChat(null)} onSendMessage={msg => aiService.generateCharacterResponse(activeChat.persona, activeChat.role, msg, historyRef.current[historyRef.current.length-1]?.narrative?.panels[0]?.description || "", selectedGenre, LANGUAGES.find(l=>l.code===selectedLanguage)!.name)} onReadAloud={handleReadAloud} />}
+            {showSettings && <TTSSettingsDialog settings={ttsSettings} achievements={worldState.achievements} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} lang={selectedLanguage} />}
+            {showExport && <ExportDialog onClose={() => setShowExport(false)} onExport={handleExport} isExporting={isExporting} lang={selectedLanguage} />}
+            {activeChat && <CharacterChatDialog persona={activeChat.persona} role={activeChat.role} onClose={() => setActiveChat(null)} onSendMessage={msg => aiService.generateCharacterResponse(activeChat.persona, activeChat.role, msg, historyRef.current[historyRef.current.length-1]?.narrative?.panels[0]?.description || "", selectedGenre, LANGUAGES.find(l=>l.code===selectedLanguage)!.name)} onReadAloud={handleReadAloud} lang={selectedLanguage} />}
         </div>
     );
 };

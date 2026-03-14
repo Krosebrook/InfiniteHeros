@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ComicFace, Bubble, ASPECT_RATIOS } from './types';
 import { LoadingFX } from './LoadingFX';
+import { soundManager } from './SoundManager';
 
 interface PanelProps {
     face?: ComicFace;
@@ -40,35 +41,50 @@ export const Panel: React.FC<PanelProps> = ({
 
     const [selectedAspectRatio, setSelectedAspectRatio] = useState("1:1");
 
-    const handleDragStart = (e: React.DragEvent, id: string, type: 'pos' | 'tail') => {
-        setDraggedBubble({ id, type });
-        e.dataTransfer.effectAllowed = "move";
-        // Hide default ghost image to use our custom live render
-        const img = new Image();
-        img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; 
-        e.dataTransfer.setDragImage(img, 0, 0);
-    };
-
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        if (!draggedBubble) return;
+    const handlePointerDown = (e: React.PointerEvent, id: string, type: 'pos' | 'tail') => {
+        if ((e.target as HTMLElement).isContentEditable) return;
+        if ((e.target as HTMLElement).tagName.toLowerCase() === 'button') return;
         
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        // Calculate percentage coordinates
+        e.preventDefault();
+        e.stopPropagation();
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        setDraggedBubble({ id, type });
+        soundManager.play('pop');
+        
+        const container = document.getElementById(`panel-${face?.id}`);
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 100;
         const y = ((e.clientY - rect.top) / rect.height) * 100;
-        
         setDraggedCoords({ x, y });
     };
 
-    const handleDrop = (e: React.DragEvent) => {
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!draggedBubble) return;
         e.preventDefault();
-        if (!draggedBubble || !face || !face.bubbles || !onBubbleUpdate) return;
-        
-        // Use last dragged coords or current mouse pos
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        e.stopPropagation();
+        const container = document.getElementById(`panel-${face?.id}`);
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 100;
         const y = ((e.clientY - rect.top) / rect.height) * 100;
+        setDraggedCoords({ x, y });
+    };
+
+    const handlePointerUp = (e: React.PointerEvent) => {
+        if (!draggedBubble || !face || !face.bubbles || !onBubbleUpdate) return;
+        e.preventDefault();
+        e.stopPropagation();
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        
+        const container = document.getElementById(`panel-${face.id}`);
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        let x = ((e.clientX - rect.left) / rect.width) * 100;
+        let y = ((e.clientY - rect.top) / rect.height) * 100;
+        
+        x = Math.max(0, Math.min(100, x));
+        y = Math.max(0, Math.min(100, y));
 
         const updatedBubbles = face.bubbles.map(b => {
             if (b.id === draggedBubble.id) {
@@ -80,6 +96,7 @@ export const Panel: React.FC<PanelProps> = ({
         onBubbleUpdate(face.id, updatedBubbles);
         setDraggedBubble(null);
         setDraggedCoords(null);
+        soundManager.play('click');
     };
 
     const handleBubbleTextChange = (id: string, text: string) => {
@@ -92,12 +109,14 @@ export const Panel: React.FC<PanelProps> = ({
         if (!face || !onBubbleUpdate) return;
         const newBubble: Bubble = { id: `manual-${Date.now()}`, text: "...", type: 'speech', x: 50, y: 50, tailX: 50, tailY: 80 };
         onBubbleUpdate(face.id, [...(face.bubbles || []), newBubble]);
+        soundManager.play('pop');
     };
 
     const handleDeleteBubble = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         if (!face?.bubbles || !onBubbleUpdate) return;
         onBubbleUpdate(face.id, face.bubbles.filter(b => b.id !== id));
+        soundManager.play('swoosh');
     };
 
     const cycleBubbleType = (e: React.MouseEvent, id: string) => {
@@ -111,14 +130,15 @@ export const Panel: React.FC<PanelProps> = ({
             }
             return b;
         }));
+        soundManager.play('click');
     };
 
     const handleRemixSubmit = () => {
-        if (face && remixPrompt) { onRemix(face.id, remixPrompt); setIsRemixing(false); setRemixPrompt(""); }
+        if (face && remixPrompt) { onRemix(face.id, remixPrompt); setIsRemixing(false); setRemixPrompt(""); soundManager.play('magic'); }
     };
 
     const handleScriptSubmit = () => {
-        if (face && scriptPrompt) { onReviseScript(face.id, scriptPrompt); setIsRevisingScript(false); setScriptPrompt(""); }
+        if (face && scriptPrompt) { onReviseScript(face.id, scriptPrompt); setIsRevisingScript(false); setScriptPrompt(""); soundManager.play('magic'); }
     };
 
     const getBubbleClasses = (type: Bubble['type']) => {
@@ -188,16 +208,25 @@ export const Panel: React.FC<PanelProps> = ({
             '3_hybrid': 'grid-cols-2 grid-rows-2 gap-2'
         }[face.layout] || 'grid-cols-1';
 
+        const loadingMessages = ['Drawing...', 'Inking...', 'Coloring...'];
+
         return (
             <div className={`grid w-full h-full bg-white ${layoutClass} p-1`}>
                 {face.panels.map((panel, i) => {
                     const spanClass = (face.layout === '3_hybrid' && i === 0) ? 'col-span-2' : '';
+                    const isGenerating = face.isLoading && !panel.imageUrl && !panel.videoUrl;
+                    const loadingMsg = loadingMessages[i % loadingMessages.length];
+
                     return (
                         <div key={i} className={`relative overflow-hidden border-4 border-black bg-gray-100 ${spanClass}`}>
-                             {panel.imageUrl ? (
+                             {panel.videoUrl ? (
+                                 <video src={panel.videoUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                             ) : panel.imageUrl ? (
                                 <img src={panel.imageUrl} className="w-full h-full object-cover" alt={`Panel ${i}`} />
+                             ) : isGenerating ? (
+                                <div className="w-full h-full"><LoadingFX message={loadingMsg} /></div>
                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gray-200 animate-pulse text-gray-400 font-comic">INKING...</div>
+                                <div className="w-full h-full flex items-center justify-center bg-gray-200 animate-pulse text-gray-400 font-comic">WAITING...</div>
                              )}
                         </div>
                     );
@@ -218,7 +247,7 @@ export const Panel: React.FC<PanelProps> = ({
         );
     }
 
-    if (face.isLoading && (!face.panels || face.panels.every(p => !p.imageUrl)) && !face.imageUrl) {
+    if (face.isLoading && (!face.panels || face.panels.length === 0) && !face.imageUrl && !face.videoUrl) {
         return <div className="w-full h-full"><LoadingFX message={face.type === 'cover' ? "Painting Cover" : "Inking Page"} /></div>;
     }
 
@@ -226,8 +255,8 @@ export const Panel: React.FC<PanelProps> = ({
 
     return (
         <motion.div 
+            id={`panel-${face.id}`}
             className={`panel-container relative group ${isFullBleed ? '!p-0 !bg-[#0a0a0a]' : ''}`}
-            onDragOver={handleDragOver} onDrop={handleDrop}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         >
             <div className="gloss"></div>
@@ -279,9 +308,11 @@ export const Panel: React.FC<PanelProps> = ({
                             <motion.div
                                 initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0 }}
                                 className={`absolute cursor-move pointer-events-auto group/bubble ${getBubbleClasses(b.type)} ${isDraggingThis && draggedBubble.type === 'pos' ? 'opacity-80 z-50 ring-2 ring-yellow-400' : ''}`}
-                                style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
-                                draggable
-                                onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, b.id, 'pos')}
+                                style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)', touchAction: 'none' }}
+                                onPointerDown={(e) => handlePointerDown(e, b.id, 'pos')}
+                                onPointerMove={handlePointerMove}
+                                onPointerUp={handlePointerUp}
+                                onPointerCancel={handlePointerUp}
                                 onDoubleClick={(e) => cycleBubbleType(e, b.id)}
                             >
                                 <button onClick={(e) => handleDeleteBubble(e, b.id)} className="absolute -top-4 -right-4 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center font-bold text-xs border-2 border-black opacity-0 group-hover/bubble:opacity-100 transition-opacity" aria-label="Delete bubble">×</button>
@@ -291,10 +322,12 @@ export const Panel: React.FC<PanelProps> = ({
                             {/* Draggable Tail Target Handle */}
                             {(b.type === 'speech' || b.type === 'thought') && (
                                 <div
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, b.id, 'tail')}
-                                    className={`absolute w-6 h-6 rounded-full cursor-crosshair z-30 pointer-events-auto flex items-center justify-center transition-all ${isDraggingThis && draggedBubble.type === 'tail' ? 'opacity-100 scale-125 bg-red-500 border-2 border-white shadow-md' : 'opacity-0 group-hover:opacity-100 bg-yellow-400 border border-black hover:scale-110'}`}
-                                    style={{ left: `${tx}%`, top: `${ty}%`, transform: 'translate(-50%, -50%)' }}
+                                    onPointerDown={(e) => handlePointerDown(e, b.id, 'tail')}
+                                    onPointerMove={handlePointerMove}
+                                    onPointerUp={handlePointerUp}
+                                    onPointerCancel={handlePointerUp}
+                                    className={`absolute w-6 h-6 rounded-full cursor-crosshair z-30 pointer-events-auto flex items-center justify-center transition-all ${isDraggingThis && draggedBubble.type === 'tail' ? 'opacity-100 scale-125 bg-red-500 border-2 border-white shadow-md' : 'opacity-60 hover:opacity-100 bg-yellow-400 border border-black hover:scale-110'}`}
+                                    style={{ left: `${tx}%`, top: `${ty}%`, transform: 'translate(-50%, -50%)', touchAction: 'none' }}
                                     title="Drag tail to speaker"
                                 >
                                     {(isDraggingThis && draggedBubble.type === 'tail') && (
@@ -313,7 +346,7 @@ export const Panel: React.FC<PanelProps> = ({
                     <h3 className="text-white font-comic text-2xl mb-4">{isRemixing ? "REMIX IMAGE" : "REVISE SCRIPT"}</h3>
                     <textarea value={isRemixing ? remixPrompt : scriptPrompt} onChange={(e) => isRemixing ? setRemixPrompt(e.target.value) : setScriptPrompt(e.target.value)} className="w-full h-24 p-2 mb-4 rounded text-black focus:outline-none focus:ring-4 focus:ring-yellow-400" placeholder="Instruction..." />
                     <div className="flex gap-2 w-full">
-                        <button onClick={() => { setIsRemixing(false); setIsRevisingScript(false); }} className="flex-1 py-2 bg-gray-600 text-white">CANCEL</button>
+                        <button onClick={() => { soundManager.play('click'); setIsRemixing(false); setIsRevisingScript(false); }} className="flex-1 py-2 bg-gray-600 text-white">CANCEL</button>
                         <button onClick={isRemixing ? handleRemixSubmit : handleScriptSubmit} className="flex-1 py-2 bg-yellow-400 text-black">GO</button>
                     </div>
                 </div>
@@ -321,18 +354,18 @@ export const Panel: React.FC<PanelProps> = ({
 
             {!face.isAnimating && !isRemixing && !isRevisingScript && (face.type === 'story' || face.type === 'cover') && (
                 <div className="absolute top-2 right-2 flex flex-col gap-2 z-40 transition-opacity duration-300 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100">
-                    {!face.videoUrl && <button onClick={(e) => { e.stopPropagation(); onAnimate(face.id); }} className="control-btn bg-yellow-400" title="Animate" aria-label="Animate Panel">🎥</button>}
-                    <button onClick={(e) => { e.stopPropagation(); setIsRemixing(true); }} className="control-btn bg-green-400" title="Remix" aria-label="Remix Image">🎨</button>
-                    <button onClick={(e) => { e.stopPropagation(); setIsRevisingScript(true); }} className="control-btn bg-orange-300" title="Revise" aria-label="Revise Script">📝</button>
-                    <button onClick={(e) => { e.stopPropagation(); onRegenerate(face.id, selectedAspectRatio); }} className="control-btn bg-white" title="Redraw" aria-label="Redraw Panel">🔄</button>
-                    <button onClick={(e) => { e.stopPropagation(); if(onDownload) onDownload(); }} className="control-btn bg-blue-500 text-white" title="Export" aria-label="Export Image">💾</button>
+                    {!face.videoUrl && <button onClick={(e) => { e.stopPropagation(); soundManager.play('magic'); onAnimate(face.id); }} className="control-btn bg-yellow-400" title="Animate" aria-label="Animate Panel">🎥</button>}
+                    <button onClick={(e) => { e.stopPropagation(); soundManager.play('click'); setIsRemixing(true); }} className="control-btn bg-green-400" title="Remix" aria-label="Remix Image">🎨</button>
+                    <button onClick={(e) => { e.stopPropagation(); soundManager.play('click'); setIsRevisingScript(true); }} className="control-btn bg-orange-300" title="Revise" aria-label="Revise Script">📝</button>
+                    <button onClick={(e) => { e.stopPropagation(); soundManager.play('magic'); onRegenerate(face.id, selectedAspectRatio); }} className="control-btn bg-white" title="Redraw" aria-label="Redraw Panel">🔄</button>
+                    <button onClick={(e) => { e.stopPropagation(); soundManager.play('success'); if(onDownload) onDownload(); }} className="control-btn bg-blue-500 text-white" title="Export" aria-label="Export Image">💾</button>
                     <button onClick={handleAddBubble} className="control-btn bg-blue-300" title="Add Bubble" aria-label="Add Speech Bubble">💬</button>
                     
                     {/* Aspect Ratio Selector for Regenerate */}
                     <select 
                         onClick={e => e.stopPropagation()}
                         value={selectedAspectRatio} 
-                        onChange={e => setSelectedAspectRatio(e.target.value)}
+                        onChange={e => { soundManager.play('click'); setSelectedAspectRatio(e.target.value); }}
                         className="control-btn w-auto text-xs px-1 font-sans bg-gray-100 hover:bg-gray-200"
                         title="Target Aspect Ratio"
                     >
@@ -345,7 +378,7 @@ export const Panel: React.FC<PanelProps> = ({
                 <div className={`absolute bottom-0 inset-x-0 p-6 flex flex-col gap-3 items-center z-20 ${face.resolvedChoice ? 'pointer-events-none opacity-0' : 'bg-gradient-to-t from-black/90 to-transparent'}`}>
                     <p className="text-white font-comic text-xl animate-pulse">MAKE YOUR CHOICE</p>
                     {face.choices.map((choice, i) => (
-                        <button key={i} onClick={(e) => { e.stopPropagation(); if(face.pageIndex) onChoice(face.pageIndex, choice); }} className={`comic-btn w-full py-3 text-lg font-bold focus:outline-none focus:ring-4 focus:ring-white ${i===0?'bg-yellow-400 text-black':'bg-blue-500 text-white'}`}>{choice}</button>
+                        <button key={i} onClick={(e) => { e.stopPropagation(); soundManager.play('success'); if(face.pageIndex) onChoice(face.pageIndex, choice); }} className={`comic-btn w-full py-3 text-lg font-bold focus:outline-none focus:ring-4 focus:ring-white ${i===0?'bg-yellow-400 text-black':'bg-blue-500 text-white'}`}>{choice}</button>
                     ))}
                 </div>
             )}

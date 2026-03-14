@@ -1,69 +1,53 @@
+# Infinite Heroes (Flash Comics)
 
-# Infinite Heroes: AI-Powered Comic Generator
-
-Infinite Heroes is a React-based Progressive Web App (PWA) that generates personalized, branching comic books using Google's Gemini models. It features a physics-inspired book interface, text-to-speech narration, and a "Multiverse Map" for exploring different narrative timelines.
+An interactive, AI-powered comic book generation application built with React, Vite, and the Google Gemini API. Create dynamic stories, upload custom characters, and watch your adventure unfold in real-time comic panels.
 
 ## Features
+- **Dynamic Storytelling:** AI-driven narrative that adapts to your choices.
+- **Real-time Art:** Comic panels generated on the fly matching your chosen art style.
+- **Character Customization:** Upload your own images or let the AI generate Heroes and Villains.
+- **Multiverse Map:** Time travel to previous decisions and explore branching storylines.
+- **Interactive Chat:** Converse directly with the characters in your story.
+- **Export:** Save your creations as PDF or ZIP files.
+- **Localization:** Available in 12+ languages.
 
-*   **Generative Storytelling**: Creates dynamic scripts, dialogue, and choices based on user-selected genres and tones.
-*   **Visual Novel Mode**: Renders consistent characters (Hero, Ally, Villain) across pages using specific visual reference prompts.
-*   **Multiverse Map**: A visual node graph representing the branching narrative tree. Users can jump to any previous decision point and explore alternative outcomes.
-*   **World State Tracking**: Persists inventory and character status (e.g., "Holding Key", "Injured Arm") to reduce AI hallucination and improve continuity.
-*   **Interactive Panels**:
-    *   **Remixing**: Users can instruction-edit specific panels (e.g., "Make the sky red").
-    *   **Video Generation**: Transforms static panels into motion comics using Veo.
-    *   **TTS**: Reads dialogue aloud using specific character voices.
-    *   **Manual Bubble Management**: 
-        *   **Add**: Insert new bubbles manually via the 💬 button.
-        *   **Edit**: Drag to move, click text to type.
-        *   **Style**: Double-click bubbles to cycle between Speech, Thought, Caption, and SFX styles.
-        *   **Delete**: Hover over a bubble and click '×' to remove.
+## Tech Stack
+- React 19
+- Vite
+- TypeScript
+- Tailwind CSS
+- `@google/genai` (Gemini 3.1 Pro & Flash Image)
+- Framer Motion
 
-## Architecture
+## Getting Started
 
-### AI Models (Google GenAI)
+### Prerequisites
+- Node.js (v18+)
+- A Google Gemini API Key (with billing enabled for image generation).
 
-The application leverages the latest Gemini models via `@google/genai`:
+### Installation
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/flash-comics.git
+   cd flash-comics
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+4. Open your browser to `http://localhost:3000` (or the port specified by Vite).
+5. Enter your Gemini API key when prompted in the app.
 
-*   **Text & Logic**: `gemini-3-pro-preview`
-    *   Used for scriptwriting, world state updates, and JSON structured output.
-*   **Image Generation**: `gemini-3-pro-image-preview`
-    *   Used for high-fidelity comic panel generation and cover art.
-*   **Image Editing**: `gemini-2.5-flash-image`
-    *   Used for the "Remix" feature (inpainting/editing via instruction).
-*   **Video**: `veo-3.1-fast-generate-preview`
-    *   Used to animate specific panels into 4-second motion clips.
-*   **Speech**: `gemini-2.5-flash-preview-tts`
-    *   Used for generating character voiceovers.
-
-### Data Structure: The Story Tree
-
-Unlike linear visual novels, Infinite Heroes stores data as a Directed Acyclic Graph (DAG) to support time travel.
-
-*   **`ComicFace`**: Represents a single page/node.
-    *   `id`: Unique UUID.
-    *   `parentId`: The ID of the page that led to this one.
-    *   `choiceLabel`: The user decision that created this branch.
-    *   `narrative`: Contains the scene description, dialogue bubbles, and choices.
-*   **`storyTree`**: A hash map (`Record<string, ComicFace>`) containing every node ever generated in the session.
-*   **`history`**: An array representing the *current* active timeline (path from Root to Leaf).
-
-## Setup
-
-1.  **Environment Variables**:
-    *   Ensure `process.env.API_KEY` is available (handled via `window.aistudio` injection in this environment).
-2.  **Dependencies**:
-    *   React 19
-    *   `@google/genai` SDK
-    *   `jspdf` / `jszip` for exporting.
-
-## Best Practices Implemented
-
-*   **Prompt Engineering**: Uses "Clean Art" prompts (requesting no text in images) to avoid artifacts, overlaying HTML bubbles instead.
-*   **State Management**: Uses `useRef` for heavy objects (history, tree) to avoid excessive re-renders during high-frequency updates, while syncing with `useState` for UI reactivity.
-*   **Resiliency**: Implements exponential backoff for AI API calls to handle rate limits (`429` / `503` errors).
-*   **Accessibility**: All generated images have alt text derived from the scene description.
+## Documentation
+Comprehensive documentation can be found in the `docs/` directory:
+- [Product Requirements (PRD)](docs/PRD.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [User Guide](docs/USER_GUIDE.md)
+- [Contributing](docs/CONTRIBUTING.md)
 
 ## License
-
-Apache-2.0
+This project is licensed under the Apache 2.0 License.

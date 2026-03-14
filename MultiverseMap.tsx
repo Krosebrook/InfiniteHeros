@@ -7,12 +7,14 @@
 import React, { useMemo } from 'react';
 import { ComicFace } from './types';
 import { soundManager } from './SoundManager';
+import { t } from './translations';
 
 interface MultiverseMapProps {
     storyTree: Record<string, ComicFace>;
     currentPath: ComicFace[];
     onNodeClick: (nodeId: string) => void;
     onClose: () => void;
+    lang: string;
 }
 
 interface TreeNode {
@@ -23,7 +25,7 @@ interface TreeNode {
     children: TreeNode[];
 }
 
-export const MultiverseMap: React.FC<MultiverseMapProps> = ({ storyTree, currentPath, onNodeClick, onClose }) => {
+export const MultiverseMap: React.FC<MultiverseMapProps> = ({ storyTree, currentPath, onNodeClick, onClose, lang }) => {
     
     // Layout Calculation
     const { nodes, edges, width, height } = useMemo(() => {
@@ -109,11 +111,11 @@ export const MultiverseMap: React.FC<MultiverseMapProps> = ({ storyTree, current
             {/* Header */}
             <div className="flex justify-between items-center p-6 border-b border-gray-800">
                 <div>
-                    <h2 className="font-comic text-4xl text-yellow-400 tracking-wider">MULTIVERSE MAP</h2>
-                    <p className="text-gray-400 font-mono text-sm">SELECT A NODE TO TIME TRAVEL</p>
+                    <h2 className="font-comic text-4xl text-yellow-400 tracking-wider">{t(lang, "MULTIVERSE_MAP")}</h2>
+                    <p className="text-gray-400 font-mono text-sm">{t(lang, "SELECT_NODE")}</p>
                 </div>
                 <button onClick={onClose} className="comic-btn bg-white text-black px-6 py-2 text-xl hover:bg-gray-200">
-                    CLOSE
+                    {t(lang, "CLOSE")}
                 </button>
             </div>
 
@@ -163,7 +165,7 @@ export const MultiverseMap: React.FC<MultiverseMapProps> = ({ storyTree, current
                                     {isLeaf && <div className="absolute inset-0 animate-pulse bg-yellow-400/20" />}
                                 </div>
                                 <div className={`mt-2 px-2 py-1 rounded text-xs font-bold font-comic whitespace-nowrap ${isActive ? 'bg-yellow-400 text-black' : 'bg-gray-800 text-gray-400'}`}>
-                                    PAGE {node.data.pageIndex}
+                                    {t(lang, "PAGE")} {node.data.pageIndex}
                                 </div>
                             </div>
                         );

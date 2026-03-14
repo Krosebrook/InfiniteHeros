@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { GENRES, ART_STYLES, LANGUAGES, TONES, PANEL_LAYOUTS, PanelLayout, Persona } from './types';
 import { soundManager } from './SoundManager';
+import { t } from './translations';
 
 interface SetupProps {
     show: boolean;
@@ -98,10 +99,11 @@ interface CharacterUploaderProps {
     onAutoGenerate: () => void;
     isRequired?: boolean;
     onToggleLock: () => void;
+    lang: string;
 }
 
 const CharacterUploader: React.FC<CharacterUploaderProps> = ({ 
-    title, role, colorClass, borderColor, textColor, persona, onUpload, onAutoGenerate, isRequired, onToggleLock
+    title, role, colorClass, borderColor, textColor, persona, onUpload, onAutoGenerate, isRequired, onToggleLock, lang
 }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -166,7 +168,7 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                             className="text-[10px] font-bold bg-black text-white px-2 py-1 hover:bg-gray-800 border border-transparent uppercase focus:outline-none focus:ring-4 focus:ring-yellow-400"
                             aria-label={`Auto-generate ${role}`}
                         >
-                           AUTO-GENERATE
+                           {t(lang, "AUTO_GENERATE")}
                         </button>
                     )}
                 </div>
@@ -207,7 +209,7 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                                 role="button"
                                 aria-label={`Replace ${role} image`}
                             >
-                                REPLACE
+                                {t(lang, "REPLACE")}
                                 <input 
                                     ref={inputRef} 
                                     type="file" 
@@ -223,7 +225,7 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                                 aria-label={`Regenerate ${role} details`}
                                 disabled={!!persona.locked}
                             >
-                                REGENERATE
+                                {t(lang, "REGENERATE")}
                             </button>
                          </div>
                     </div>
@@ -236,7 +238,7 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                         aria-label={`Upload image for ${role}`}
                     >
                         <span className="text-3xl mb-2" aria-hidden="true">📁</span>
-                        <span>UPLOAD IMAGE</span>
+                        <span>{t(lang, "UPLOAD_IMAGE")}</span>
                         <span className="text-xs font-sans opacity-70 mt-1">JPG, PNG (Max 5MB)</span>
                         <input 
                             ref={inputRef} 
@@ -303,14 +305,14 @@ export const Setup: React.FC<SetupProps> = (props) => {
           <div className="min-h-full flex items-center justify-center p-4 pb-20">
             <div className="max-w-[1100px] w-full bg-white p-4 md:p-6 rotate-1 border-[6px] border-black shadow-[12px_12px_0px_rgba(0,0,0,0.6)] text-center relative">
                 
-                <h1 className="font-comic text-5xl md:text-6xl text-red-600 leading-none mb-1 tracking-wide inline-block mr-3" style={{textShadow: '3px 3px 0px black'}}>INFINITE</h1>
-                <h1 className="font-comic text-5xl md:text-6xl text-yellow-400 leading-none mb-6 tracking-wide inline-block" style={{textShadow: '3px 3px 0px black'}}>HEROES</h1>
+                <h1 className="font-comic text-5xl md:text-6xl text-red-600 leading-none mb-1 tracking-wide inline-block mr-3" style={{textShadow: '3px 3px 0px black'}}>{t(props.selectedLanguage, "INFINITE")}</h1>
+                <h1 className="font-comic text-5xl md:text-6xl text-yellow-400 leading-none mb-6 tracking-wide inline-block" style={{textShadow: '3px 3px 0px black'}}>{t(props.selectedLanguage, "HEROES")}</h1>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 text-left">
                     
                     <CharacterUploader 
-                        title="1. THE HERO"
-                        role="REQUIRED HERO"
+                        title={t(props.selectedLanguage, "THE_HERO")}
+                        role={t(props.selectedLanguage, "REQUIRED_HERO")}
                         colorClass="bg-blue-50"
                         borderColor="border-blue-300"
                         textColor="text-blue-900"
@@ -319,11 +321,12 @@ export const Setup: React.FC<SetupProps> = (props) => {
                         onAutoGenerate={props.onAutoGenerateHero}
                         isRequired={true}
                         onToggleLock={props.onToggleHeroLock}
+                        lang={props.selectedLanguage}
                     />
 
                     <CharacterUploader 
-                        title="2. THE SIDEKICK"
-                        role="OPTIONAL ALLY"
+                        title={t(props.selectedLanguage, "THE_SIDEKICK")}
+                        role={t(props.selectedLanguage, "OPTIONAL_ALLY")}
                         colorClass="bg-purple-50"
                         borderColor="border-purple-300"
                         textColor="text-purple-900"
@@ -331,12 +334,13 @@ export const Setup: React.FC<SetupProps> = (props) => {
                         onUpload={props.onFriendUpload}
                         onAutoGenerate={props.onAutoGenerateFriend}
                         onToggleLock={props.onToggleFriendLock}
+                        lang={props.selectedLanguage}
                     />
 
                     <div className="flex flex-col gap-3">
                          <CharacterUploader 
-                            title="3. THE VILLAIN"
-                            role="OPTIONAL THREAT"
+                            title={t(props.selectedLanguage, "THE_VILLAIN")}
+                            role={t(props.selectedLanguage, "OPTIONAL_THREAT")}
                             colorClass="bg-red-50"
                             borderColor="border-red-500"
                             textColor="text-red-900"
@@ -344,11 +348,12 @@ export const Setup: React.FC<SetupProps> = (props) => {
                             onUpload={props.onVillainUpload}
                             onAutoGenerate={props.onAutoGenerateVillain}
                             onToggleLock={props.onToggleVillainLock}
+                            lang={props.selectedLanguage}
                         />
                         <button onClick={() => { playClick(); props.onGenerateBios(); }} 
                                 className="comic-btn bg-white text-black text-sm px-4 py-2 hover:bg-gray-100 flex items-center justify-center gap-2 mt-auto"
                                 disabled={!props.hero}>
-                            <span>✨</span> GENERATE NAMES & BACKSTORIES
+                            {t(props.selectedLanguage, "GENERATE_NAMES")}
                         </button>
                     </div>
 
@@ -358,34 +363,35 @@ export const Setup: React.FC<SetupProps> = (props) => {
                 {/* SETTINGS AREA */}
                 <div className="mb-6 p-4 bg-yellow-50 border-4 border-black text-left grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                      <div>
-                        <label htmlFor="genre-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">GENRE</label>
+                        <label htmlFor="genre-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">{t(props.selectedLanguage, "GENRE")}</label>
                         <select id="genre-select" value={props.selectedGenre} onChange={(e) => { playClick(); props.onGenreChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
                             {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="style-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">ART STYLE</label>
+                        <label htmlFor="style-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">{t(props.selectedLanguage, "ART_STYLE")}</label>
                         <select id="style-select" value={props.selectedArtStyle} onChange={(e) => { playClick(); props.onArtStyleChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
                             {filteredStyles.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="lang-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">LANGUAGE</label>
+                        <label htmlFor="lang-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">{t(props.selectedLanguage, "LANGUAGE")}</label>
                         <select id="lang-select" value={props.selectedLanguage} onChange={(e) => { playClick(); props.onLanguageChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
                             {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="layout-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">LAYOUT</label>
+                        <label htmlFor="layout-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">{t(props.selectedLanguage, "LAYOUT")}</label>
                         <select id="layout-select" value={props.selectedLayout} onChange={(e) => { playClick(); props.onLayoutChange(e.target.value as PanelLayout); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
                             {PANEL_LAYOUTS.map(l => <option key={l} value={l}>{l.replace('_', ' ').toUpperCase()}</option>)}
                         </select>
                     </div>
                     <div className="flex flex-col lg:col-span-2">
-                        <label htmlFor="tone-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">STORY TONE</label>
+                        <label htmlFor="tone-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">{t(props.selectedLanguage, "STORY_TONE")}</label>
                         <select id="tone-select" value={props.selectedTone} onChange={(e) => { playClick(); props.onToneChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
                             {TONES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
+
                         {props.selectedGenre === 'Custom' && (
                             <textarea 
                                 value={props.customPremise} 
@@ -401,11 +407,11 @@ export const Setup: React.FC<SetupProps> = (props) => {
                 <div className="flex gap-4 w-full">
                     {props.hasSave && (
                         <button onClick={() => { playClick(); props.onResume?.(); }} className="comic-btn bg-green-500 text-white text-xl px-4 py-4 hover:bg-green-400 flex-1 uppercase tracking-wider shadow-[8px_8px_0px_black]">
-                             Resume Adventure
+                             {t(props.selectedLanguage, "RESUME_ADVENTURE")}
                         </button>
                     )}
                     <button onClick={() => { playClick(); props.onLaunch(); }} disabled={!props.hero || props.isTransitioning} className="comic-btn bg-red-600 text-white text-4xl px-8 py-4 flex-[2] hover:bg-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed uppercase tracking-wider shadow-[8px_8px_0px_black] hover:shadow-[10px_10px_0px_black]">
-                        {props.isTransitioning ? 'INKING PAGES...' : 'START ADVENTURE!'}
+                        {props.isTransitioning ? t(props.selectedLanguage, "INKING_PAGES") : t(props.selectedLanguage, "START_ADVENTURE")}
                     </button>
                 </div>
             </div>

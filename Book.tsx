@@ -9,6 +9,7 @@ import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion';
 import { ComicFace, TOTAL_PAGES, Persona, Bubble, WorldState } from './types';
 import { Panel } from './Panel';
 import { soundManager } from './SoundManager';
+import { t } from './translations';
 
 interface BookProps {
     comicFaces: ComicFace[];
@@ -20,6 +21,7 @@ interface BookProps {
     villain: Persona | null;
     worldState: WorldState;
     onOpenBio: () => void;
+    onOpenInventory: () => void;
     onSheetClick: (index: number) => void;
     onChoice: (pageIndex: number, choice: string) => void;
     onOpenBook: () => void;
@@ -34,6 +36,9 @@ interface BookProps {
     onBubbleUpdate: (pageId: string, bubbles: Bubble[]) => void;
     onOpenMap: () => void; 
     onOpenSettings: () => void;
+    onSaveProgress: () => void;
+    onGenerateCover: () => void;
+    lang: string;
 }
 
 export const Book: React.FC<BookProps> = (props) => {
@@ -163,7 +168,7 @@ export const Book: React.FC<BookProps> = (props) => {
                 {/* Health Bar UI */}
                 <div className="bg-black/80 border-2 border-white p-2 flex flex-col gap-1 w-48 shadow-lg">
                     <div className="flex justify-between text-[10px] font-bold text-white uppercase">
-                        <span>Health</span>
+                        <span>{t(props.lang, "HEALTH")}</span>
                         <span>{props.worldState.health}%</span>
                     </div>
                     <div className="h-2 bg-gray-700 border border-black overflow-hidden">
@@ -176,16 +181,25 @@ export const Book: React.FC<BookProps> = (props) => {
                 </div>
 
                 <button onClick={props.onOpenBio} className="bg-yellow-400 border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-2" aria-label="Open Character Bios">
-                  <span aria-hidden="true">👥</span> CAST
+                  <span aria-hidden="true">👥</span> {t(props.lang, "CAST")}
+                </button>
+                <button onClick={props.onOpenInventory} className="bg-orange-400 border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-2" aria-label="Open Inventory">
+                  <span aria-hidden="true">🎒</span> {t(props.lang, "BAG")}
                 </button>
                 <button onClick={props.onOpenMap} className="bg-blue-400 border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-2" aria-label="Open Multiverse Map">
-                  <span aria-hidden="true">🕸️</span> MAP
+                  <span aria-hidden="true">🕸️</span> {t(props.lang, "MAP")}
                 </button>
                 <button onClick={props.onOpenSettings} className="bg-gray-200 border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex items-center gap-2" aria-label="Open Settings">
                   <span aria-hidden="true">⚙️</span>
                 </button>
-                <button onClick={props.onExportImages} className="bg-green-400 border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-2" aria-label="Save and Export">
-                  <span aria-hidden="true">💾</span> SAVE
+                <button onClick={props.onGenerateCover} className="bg-purple-500 border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-2 text-white" aria-label="Generate Cover">
+                  <span aria-hidden="true">🎨</span> {t(props.lang, "COVER")}
+                </button>
+                <button onClick={props.onExportImages} className="bg-green-400 border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-2" aria-label="Export">
+                  <span aria-hidden="true">📤</span> {t(props.lang, "EXPORT")}
+                </button>
+                <button onClick={props.onSaveProgress} className="bg-blue-600 text-white border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-2" aria-label="Save Progress">
+                  <span aria-hidden="true">💾</span> {t(props.lang, "SAVE")}
                 </button>
             </motion.div>
         )}

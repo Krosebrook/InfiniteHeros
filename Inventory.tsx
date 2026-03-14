@@ -6,13 +6,15 @@
 
 import React from 'react';
 import { InventoryItem } from './types';
+import { t } from './translations';
 
 interface InventoryProps {
     items: InventoryItem[];
     status: string[];
+    lang: string;
 }
 
-export const Inventory: React.FC<InventoryProps> = ({ items, status }) => {
+export const Inventory: React.FC<InventoryProps> = ({ items, status, lang }) => {
     const hasContent = items.length > 0 || status.length > 0;
     
     if (!hasContent) return null;
@@ -26,7 +28,7 @@ export const Inventory: React.FC<InventoryProps> = ({ items, status }) => {
             {status.length > 0 && (
                 <section aria-labelledby="status-heading" className="pointer-events-auto flex flex-col items-start gap-2">
                     <h3 id="status-heading" className="font-comic text-yellow-400 text-xl tracking-widest drop-shadow-[2px_2px_0px_black] uppercase bg-black/50 px-2 rotate-[-2deg]">
-                        Status
+                        {t(lang, "STATUS")}
                     </h3>
                     <div className="flex flex-col gap-2 w-full">
                         {status.map((s, i) => (
@@ -47,7 +49,7 @@ export const Inventory: React.FC<InventoryProps> = ({ items, status }) => {
             {items.length > 0 && (
                 <section aria-labelledby="inventory-heading" className="pointer-events-auto flex flex-col items-start gap-2">
                     <h3 id="inventory-heading" className="font-comic text-yellow-400 text-xl tracking-widest drop-shadow-[2px_2px_0px_black] uppercase bg-black/50 px-2 rotate-[-2deg]">
-                        Inventory
+                        {t(lang, "INVENTORY")}
                     </h3>
                     <div className="flex flex-col gap-2 w-full" role="list">
                         {items.map((item, i) => (
