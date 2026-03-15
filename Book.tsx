@@ -33,6 +33,7 @@ interface BookProps {
     onReviseScript: (id: string, instruction: string) => void;
     onReadAloud: (text: string, context?: string) => Promise<void>;
     onExportImages: () => void;
+    onGenerateVideo: () => void;
     onBubbleUpdate: (pageId: string, bubbles: Bubble[]) => void;
     onOpenMap: () => void; 
     onOpenSettings: () => void;
@@ -197,6 +198,9 @@ export const Book: React.FC<BookProps> = (props) => {
                 </button>
                 <button onClick={props.onExportImages} className="bg-green-400 border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-2" aria-label="Export">
                   <span aria-hidden="true">📤</span> {t(props.lang, "EXPORT")}
+                </button>
+                <button onClick={props.onGenerateVideo} className="bg-red-500 text-white border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-2" aria-label="Generate Video">
+                  <span aria-hidden="true">🎬</span> VIDEO
                 </button>
                 <button onClick={props.onSaveProgress} className="bg-blue-600 text-white border-4 border-black px-4 py-2 font-comic text-xl hover:scale-105 shadow-[4px_4px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-2" aria-label="Save Progress">
                   <span aria-hidden="true">💾</span> {t(props.lang, "SAVE")}

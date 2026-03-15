@@ -24,6 +24,7 @@ import { soundManager } from './SoundManager';
 import { saveGame, loadGame } from './db';
 import { TTSSettingsDialog } from './TTSSettingsDialog';
 import { CharacterChatDialog } from './CharacterChatDialog';
+import { VideoGenerator } from './VideoGenerator';
 import * as aiService from './aiService';
 
 const INITIAL_ACHIEVEMENTS: Achievement[] = [
@@ -128,6 +129,7 @@ const InfiniteHeroesGame: React.FC = () => {
     const [showSetup, setShowSetup] = useState(true);
     const [showSettings, setShowSettings] = useState(false);
     const [showExport, setShowExport] = useState(false);
+    const [showVideoGenerator, setShowVideoGenerator] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [rollingDiceFor, setRollingDiceFor] = useState<{pageIndex: number, choice: string} | null>(null);
     
@@ -716,6 +718,7 @@ const InfiniteHeroesGame: React.FC = () => {
                 onChoice={handleChoice}
                 onOpenBook={() => setCurrentSheetIndex(1)}
                 onDownload={() => setShowExport(true)} 
+                onGenerateVideo={() => setShowVideoGenerator(true)}
                 onReset={() => { localStorage.clear(); window.location.reload(); }}
                 onAnimate={async id => {
                     const f = storyTreeRef.current[id];
@@ -809,6 +812,7 @@ const InfiniteHeroesGame: React.FC = () => {
             }} />}
             {showSettings && <TTSSettingsDialog settings={ttsSettings} achievements={worldState.achievements} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} lang={selectedLanguage} />}
             {showExport && <ExportDialog onClose={() => setShowExport(false)} onExport={handleExport} isExporting={isExporting} lang={selectedLanguage} />}
+            {showVideoGenerator && <VideoGenerator comicFaces={comicFaces} onClose={() => setShowVideoGenerator(false)} />}
             {activeChat && <CharacterChatDialog persona={activeChat.persona} role={activeChat.role} onClose={() => setActiveChat(null)} onSendMessage={msg => aiService.generateCharacterResponse(activeChat.persona, activeChat.role, msg, historyRef.current[historyRef.current.length-1]?.narrative?.panels[0]?.description || "", selectedGenre, LANGUAGES.find(l=>l.code===selectedLanguage)!.name)} onReadAloud={handleReadAloud} lang={selectedLanguage} />}
         </div>
     );
