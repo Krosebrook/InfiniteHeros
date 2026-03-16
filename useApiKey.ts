@@ -4,13 +4,18 @@
 */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { GoogleGenAI } from '@google/genai';
+
+declare global {
+  interface Window {
+    aistudio: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
 
 interface ApiKeyContextType {
-  apiKey: string | null;
   isValid: boolean;
-  saveApiKey: (key: string) => Promise<boolean>;
-  clearApiKey: () => void;
   showDialog: boolean;
   setShowDialog: (show: boolean) => void;
   validateApiKey: () => Promise<boolean>;
@@ -19,64 +24,41 @@ interface ApiKeyContextType {
 const ApiKeyContext = createContext<ApiKeyContextType | undefined>(undefined);
 
 export const ApiKeyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [apiKey, setApiKey] = useState<string | null>(localStorage.getItem('gemini_api_key'));
   const [isValid, setIsValid] = useState<boolean>(false);
   const [showDialog, setShowDialog] = useState(false);
 
   useEffect(() => {
-    // Initial load check
-    const stored = localStorage.getItem('gemini_api_key');
-    const envKey = process.env.API_KEY;
-
-    if (stored) {
-        setApiKey(stored);
-        setIsValid(true); // Optimistic valid
-    } else if (envKey) {
-        setApiKey(envKey);
-        setIsValid(true);
-    } else {
-        setShowDialog(true);
-    }
+    const checkKey = async () => {
+      try {
+        if (window.aistudio && await window.aistudio.hasSelectedApiKey()) {
+          setIsValid(true);
+        } else {
+          setShowDialog(true);
+        }
+      } catch (e) {
+        console.error("Error checking API key status", e);
+      }
+    };
+    checkKey();
   }, []);
 
-  const saveApiKey = useCallback(async (key: string): Promise<boolean> => {
-    try {
-        // Validation Call
-        const ai = new GoogleGenAI({ apiKey: key });
-        // Lightweight check
-        await ai.models.generateContent({
-            model: 'gemini-3-flash-preview', 
-            contents: { parts: [{ text: 'Ping' }] }
-        });
-        
-        localStorage.setItem('gemini_api_key', key);
-        setApiKey(key);
-        setIsValid(true);
-        setShowDialog(false);
-        return true;
-    } catch (e) {
-        console.error("API Key Validation Failed", e);
-        return false;
-    }
-  }, []);
-
-  const clearApiKey = useCallback(() => {
-      localStorage.removeItem('gemini_api_key');
-      setApiKey(null);
-      setIsValid(false);
-      setShowDialog(true);
-  }, []);
-
-  // Helper for components to check validity and trigger dialog if needed
   const validateApiKey = useCallback(async (): Promise<boolean> => {
-      if (isValid && apiKey) return true;
+      try {
+        if (window.aistudio && await window.aistudio.hasSelectedApiKey()) {
+          setIsValid(true);
+          setShowDialog(false);
+          return true;
+        }
+      } catch (e) {
+        console.error("Error validating API key", e);
+      }
       setShowDialog(true);
       return false;
-  }, [isValid, apiKey]);
+  }, []);
 
   return React.createElement(
     ApiKeyContext.Provider,
-    { value: { apiKey, isValid, saveApiKey, clearApiKey, showDialog, setShowDialog, validateApiKey } },
+    { value: { isValid, showDialog, setShowDialog, validateApiKey } },
     children
   );
 };

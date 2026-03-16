@@ -136,7 +136,14 @@ export const LoadingFX: React.FC<LoadingFXProps> = ({ message }) => {
     };
 
     return (
-        <div className="w-full h-full bg-[#fdfbf7] overflow-hidden relative border-r-4 border-gray-300">
+        <div 
+            className="w-full h-full bg-[#fdfbf7] overflow-hidden relative border-r-4 border-gray-300"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.floor(progress)}
+            aria-label={message || "Loading content"}
+        >
             <style>{`
               @keyframes comic-pop {
                   0% { transform: translate(-50%, -50%) scale(0) rotate(var(--rot)); opacity: 0; }

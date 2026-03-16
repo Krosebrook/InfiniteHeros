@@ -152,6 +152,7 @@ export interface Beat {
 
 export interface Persona {
   base64: string;
+  mimeType?: string;
   desc: string;
   name?: string;
   backstory?: string;

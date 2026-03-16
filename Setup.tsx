@@ -106,6 +106,7 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
     title, role, colorClass, borderColor, textColor, persona, onUpload, onAutoGenerate, isRequired, onToggleLock, lang
 }) => {
     const [isLoading, setIsLoading] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -137,6 +138,19 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
         }
     };
 
+    const handleAutoGenerate = async () => {
+        soundManager.play('click');
+        setIsGenerating(true);
+        try {
+            await onAutoGenerate();
+        } catch (err) {
+            console.error(err);
+            setError("Generation failed.");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -145,28 +159,32 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
     };
 
     return (
-        <div className="flex flex-col gap-3">
-            <div className="font-comic text-xl text-black border-b-4 border-black mb-1">{title}</div>
+        <section className="flex flex-col gap-3 relative" aria-labelledby={`${title.replace(/\s+/g, '-').toLowerCase()}-title`}>
+            <div className="absolute -top-3 -left-3 bg-black text-white px-3 py-1 font-comic text-lg uppercase transform -rotate-3 border-2 border-white shadow-md z-20">
+                <h2 id={`${title.replace(/\s+/g, '-').toLowerCase()}-title`}>{title}</h2>
+            </div>
             
-            <div className={`p-3 border-4 border-dashed ${persona ? 'border-green-500 bg-green-50' : `${borderColor} ${colorClass}`} transition-colors flex-1 flex flex-col relative`}>
-                <div className="flex justify-between items-center mb-2">
-                    <p className={`font-comic text-lg uppercase font-bold ${textColor}`}>{role}</p>
+            <div className={`p-4 border-4 border-black ${persona ? 'bg-green-50' : `${borderColor} ${colorClass}`} shadow-[6px_6px_0px_rgba(0,0,0,1)] transition-colors flex-1 flex flex-col relative mt-2`}>
+                <div className="flex justify-between items-center mb-4">
+                    <p className={`font-comic text-xl uppercase font-bold ${textColor} tracking-wider`}>{role}</p>
                     {persona ? (
-                        <div className="flex items-center gap-2">
-                            <span className="text-green-600 font-bold font-comic text-sm animate-pulse">✓ READY</span>
+                        <div className="flex items-center gap-2 bg-white border-2 border-black px-2 py-1 transform rotate-2">
+                            <span className="text-green-600 font-bold font-comic text-sm animate-pulse" aria-label="Character ready">✓ READY</span>
                             <button 
                                 onClick={(e) => { e.stopPropagation(); onToggleLock(); soundManager.play('click'); }}
                                 className={`text-xl ${persona.locked ? 'grayscale-0' : 'grayscale opacity-50 hover:opacity-100'} transition-all`}
-                                title={persona.locked ? "Character Locked (Will be used as reference)" : "Character Unlocked"}
+                                title={persona.locked ? "Character Locked (Will be used as reference)" : "Character Unlocked (Will be regenerated if story changes)"}
+                                aria-label={persona.locked ? "Unlock character" : "Lock character"}
                             >
                                 {persona.locked ? '🔒' : '🔓'}
                             </button>
                         </div>
                     ) : (
-                        !isLoading && <button 
-                            onClick={() => { soundManager.play('click'); onAutoGenerate(); }} 
-                            className="text-[10px] font-bold bg-black text-white px-2 py-1 hover:bg-gray-800 border border-transparent uppercase focus:outline-none focus:ring-4 focus:ring-yellow-400"
-                            aria-label={`Auto-generate ${role}`}
+                        !(isLoading || isGenerating) && <button 
+                            onClick={handleAutoGenerate} 
+                            className="text-xs font-bold bg-black text-white px-3 py-2 hover:bg-gray-800 border-2 border-transparent uppercase focus:outline-none focus:ring-4 focus:ring-yellow-400 shadow-[2px_2px_0px_rgba(0,0,0,0.5)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+                            aria-label={`Auto-generate ${role} from genre prompts`}
+                            title={`Auto-generate ${role}`}
                         >
                            {t(lang, "AUTO_GENERATE")}
                         </button>
@@ -180,10 +198,10 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                     </div>
                 )}
 
-                {isLoading && (
-                    <div className="absolute inset-0 bg-white/80 z-10 flex flex-col items-center justify-center backdrop-blur-sm" aria-live="assertive" aria-label="Analyzing image">
+                {(isLoading || isGenerating) && (
+                    <div className="absolute inset-0 bg-white/80 z-10 flex flex-col items-center justify-center backdrop-blur-sm" aria-live="assertive" aria-label={isLoading ? "Analyzing image" : "Generating character"}>
                         <div className="w-8 h-8 border-4 border-black border-t-yellow-400 rounded-full animate-spin mb-2" />
-                        <span className="font-comic text-sm animate-pulse">ANALYZING IMAGE...</span>
+                        <span className="font-comic text-sm animate-pulse">{isLoading ? "ANALYZING IMAGE..." : "GENERATING..."}</span>
                     </div>
                 )}
                 
@@ -221,9 +239,9 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                             </label>
                             <button 
                                 className={`comic-btn bg-white text-black text-xs px-2 py-2 hover:bg-gray-100 flex-1 text-center ${persona.locked ? 'opacity-50 pointer-events-none' : ''}`}
-                                onClick={() => { if(!persona.locked) { soundManager.play('click'); onAutoGenerate(); }}}
+                                onClick={() => { if(!persona.locked) { handleAutoGenerate(); }}}
                                 aria-label={`Regenerate ${role} details`}
-                                disabled={!!persona.locked}
+                                disabled={!!persona.locked || isGenerating}
                             >
                                 {t(lang, "REGENERATE")}
                             </button>
@@ -251,7 +269,7 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                     </label>
                 )}
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -296,19 +314,28 @@ export const Setup: React.FC<SetupProps> = (props) => {
         )}
         
         <div className={`fixed inset-0 z-[200] overflow-y-auto`}
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="setup-title"
              style={{
                  background: props.isTransitioning ? 'transparent' : 'rgba(0,0,0,0.85)', 
                  backdropFilter: props.isTransitioning ? 'none' : 'blur(6px)',
                  animation: props.isTransitioning ? 'knockout-exit 1s forwards cubic-bezier(.6,-0.28,.74,.05)' : 'none',
                  pointerEvents: props.isTransitioning ? 'none' : 'auto'
              }}>
-          <div className="min-h-full flex items-center justify-center p-4 pb-20">
-            <div className="max-w-[1100px] w-full bg-white p-4 md:p-6 rotate-1 border-[6px] border-black shadow-[12px_12px_0px_rgba(0,0,0,0.6)] text-center relative">
+          <div className="min-h-full flex items-center justify-center p-2 md:p-4 pb-24 md:pb-20">
+            <div className="max-w-[1100px] w-full bg-white p-4 md:p-8 rotate-1 border-[4px] md:border-[8px] border-black shadow-[12px_12px_0px_rgba(0,0,0,1)] md:shadow-[20px_20px_0px_rgba(0,0,0,1)] text-center relative overflow-hidden">
                 
-                <h1 className="font-comic text-5xl md:text-6xl text-red-600 leading-none mb-1 tracking-wide inline-block mr-3" style={{textShadow: '3px 3px 0px black'}}>{t(props.selectedLanguage, "INFINITE")}</h1>
-                <h1 className="font-comic text-5xl md:text-6xl text-yellow-400 leading-none mb-6 tracking-wide inline-block" style={{textShadow: '3px 3px 0px black'}}>{t(props.selectedLanguage, "HEROES")}</h1>
+                {/* Comic Book Halftone Background Pattern */}
+                <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 2px, transparent 2.5px)', backgroundSize: '12px 12px' }}></div>
+
+                <header id="setup-title" className="relative z-10 mb-6">
+                    <div className="inline-block bg-black px-6 py-2 transform -skew-x-12 shadow-[6px_6px_0px_#EF4444]">
+                        <h1 className="font-comic text-4xl md:text-7xl text-white leading-none tracking-wider uppercase">{t(props.selectedLanguage, "INFINITE")} <span className="text-yellow-400">{t(props.selectedLanguage, "HEROES")}</span></h1>
+                    </div>
+                </header>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 text-left">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 mb-8 text-left relative z-10">
                     
                     <CharacterUploader 
                         title={t(props.selectedLanguage, "THE_HERO")}
@@ -361,34 +388,35 @@ export const Setup: React.FC<SetupProps> = (props) => {
                 </div>
                 
                 {/* SETTINGS AREA */}
-                <div className="mb-6 p-4 bg-yellow-50 border-4 border-black text-left grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="mb-8 p-6 bg-yellow-50 border-4 border-black text-left grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 shadow-[8px_8px_0px_rgba(0,0,0,1)] relative z-10 transform -rotate-1">
+                     <div className="absolute -top-4 -left-4 bg-black text-white px-3 py-1 font-comic text-lg uppercase transform -rotate-6 border-2 border-white shadow-md">World Settings</div>
                      <div>
-                        <label htmlFor="genre-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">{t(props.selectedLanguage, "GENRE")}</label>
-                        <select id="genre-select" value={props.selectedGenre} onChange={(e) => { playClick(); props.onGenreChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                        <label htmlFor="genre-select" className="font-comic text-lg mb-1 font-bold text-gray-800 block uppercase tracking-wide">{t(props.selectedLanguage, "GENRE")}</label>
+                        <select id="genre-select" value={props.selectedGenre} onChange={(e) => { playClick(); props.onGenreChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
                             {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="style-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">{t(props.selectedLanguage, "ART_STYLE")}</label>
-                        <select id="style-select" value={props.selectedArtStyle} onChange={(e) => { playClick(); props.onArtStyleChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                        <label htmlFor="style-select" className="font-comic text-lg mb-1 font-bold text-gray-800 block uppercase tracking-wide">{t(props.selectedLanguage, "ART_STYLE")}</label>
+                        <select id="style-select" value={props.selectedArtStyle} onChange={(e) => { playClick(); props.onArtStyleChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
                             {filteredStyles.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="lang-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">{t(props.selectedLanguage, "LANGUAGE")}</label>
-                        <select id="lang-select" value={props.selectedLanguage} onChange={(e) => { playClick(); props.onLanguageChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                        <label htmlFor="lang-select" className="font-comic text-lg mb-1 font-bold text-gray-800 block uppercase tracking-wide">{t(props.selectedLanguage, "LANGUAGE")}</label>
+                        <select id="lang-select" value={props.selectedLanguage} onChange={(e) => { playClick(); props.onLanguageChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
                             {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="layout-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">{t(props.selectedLanguage, "LAYOUT")}</label>
-                        <select id="layout-select" value={props.selectedLayout} onChange={(e) => { playClick(); props.onLayoutChange(e.target.value as PanelLayout); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                        <label htmlFor="layout-select" className="font-comic text-lg mb-1 font-bold text-gray-800 block uppercase tracking-wide">{t(props.selectedLanguage, "LAYOUT")}</label>
+                        <select id="layout-select" value={props.selectedLayout} onChange={(e) => { playClick(); props.onLayoutChange(e.target.value as PanelLayout); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
                             {PANEL_LAYOUTS.map(l => <option key={l} value={l}>{l.replace('_', ' ').toUpperCase()}</option>)}
                         </select>
                     </div>
                     <div className="flex flex-col lg:col-span-2">
-                        <label htmlFor="tone-select" className="font-comic text-sm mb-1 font-bold text-gray-800 block">{t(props.selectedLanguage, "STORY_TONE")}</label>
-                        <select id="tone-select" value={props.selectedTone} onChange={(e) => { playClick(); props.onToneChange(e.target.value); }} className="w-full font-comic text-base p-1 border-2 border-black uppercase bg-white cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                        <label htmlFor="tone-select" className="font-comic text-lg mb-1 font-bold text-gray-800 block uppercase tracking-wide">{t(props.selectedLanguage, "STORY_TONE")}</label>
+                        <select id="tone-select" value={props.selectedTone} onChange={(e) => { playClick(); props.onToneChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
                             {TONES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
 
@@ -397,20 +425,20 @@ export const Setup: React.FC<SetupProps> = (props) => {
                                 value={props.customPremise} 
                                 onChange={(e) => props.onPremiseChange(e.target.value)} 
                                 placeholder="Story Premise..." 
-                                className="w-full p-1 border-2 border-black font-comic text-sm h-12 resize-none mt-2 focus:outline-none focus:ring-4 focus:ring-yellow-400" 
+                                className="w-full p-3 border-4 border-black font-comic text-lg h-24 resize-none mt-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-4 focus:ring-yellow-400" 
                                 aria-label="Custom Story Premise"
                             />
                         )}
                     </div>
                 </div>
 
-                <div className="flex gap-4 w-full">
+                <div className="flex flex-col sm:flex-row gap-4 w-full">
                     {props.hasSave && (
-                        <button onClick={() => { playClick(); props.onResume?.(); }} className="comic-btn bg-green-500 text-white text-xl px-4 py-4 hover:bg-green-400 flex-1 uppercase tracking-wider shadow-[8px_8px_0px_black]">
+                        <button onClick={() => { playClick(); props.onResume?.(); }} className="comic-btn bg-green-500 text-white text-xl px-4 py-4 hover:bg-green-400 flex-1 uppercase tracking-wider shadow-[8px_8px_0px_black] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all" title="Resume your previous adventure">
                              {t(props.selectedLanguage, "RESUME_ADVENTURE")}
                         </button>
                     )}
-                    <button onClick={() => { playClick(); props.onLaunch(); }} disabled={!props.hero || props.isTransitioning} className="comic-btn bg-red-600 text-white text-4xl px-8 py-4 flex-[2] hover:bg-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed uppercase tracking-wider shadow-[8px_8px_0px_black] hover:shadow-[10px_10px_0px_black]">
+                    <button onClick={() => { playClick(); props.onLaunch(); }} disabled={!props.hero || props.isTransitioning} className="comic-btn bg-red-600 text-white text-3xl md:text-4xl px-8 py-4 flex-[2] hover:bg-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed uppercase tracking-wider shadow-[8px_8px_0px_black] hover:shadow-[10px_10px_0px_black] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all" title="Start a new adventure">
                         {props.isTransitioning ? t(props.selectedLanguage, "INKING_PAGES") : t(props.selectedLanguage, "START_ADVENTURE")}
                     </button>
                 </div>

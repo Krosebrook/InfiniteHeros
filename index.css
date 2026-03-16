@@ -1,4 +1,208 @@
 
+@import "tailwindcss";
+
+/* 
+  Comic Book Layout & Mechanics
+*/
+
+:root {
+  /* 2:3 Aspect Ratio: 500w / 750h. Matches classic comic book ratio. 
+     We use min(80vh, 750px) to ensure it fits in the viewport even on desktop. */
+  --page-height: min(80vh, 750px);
+  --page-width: calc(var(--page-height) * 0.666);
+}
+
+@media (max-width: 768px) {
+  /* On mobile, maintain aspect ratio but ensure it fits in viewport (width OR height) 
+     We limit height to 80vh to ensure it doesn't overflow vertically. */
+  :root { 
+       --page-height: min(80vh, 130vw);
+       --page-width: calc(var(--page-height) * 0.666);
+  }
+}
+
+/* Fixed background layer */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-color: #222;
+  background-image: radial-gradient(#333 15%, transparent 16%), radial-gradient(#333 15%, transparent 16%);
+  background-size: 60px 60px;
+  background-position: 0 0, 30px 30px;
+  z-index: -1;
+  pointer-events: none;
+}
+
+body {
+  min-height: 100vh;
+  font-family: 'Comic Neue', sans-serif;
+  margin: 0;
+}
+
+/* Lock overflow only on desktop to maintain the fixed app feel.
+   On mobile, we allow default browser behavior so pinch-zoom works naturally. */
+@media (min-width: 769px) {
+  body { overflow-x: hidden; }
+}
+
+.font-comic { font-family: 'Bangers', cursive; }
+
+/* --- 3D Book Mechanics --- */
+.comic-scene {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 0;
+  perspective: 3500px;
+  min-width: 100vw;
+}
+
+@media (max-width: 768px) {
+  .comic-scene { 
+       perspective: 2000px; 
+       align-items: center;
+       padding-top: 0;
+       min-height: 100vh;
+       height: auto; 
+       overflow: visible; 
+  }
+}
+
+.book {
+  position: relative;
+  width: var(--page-width);
+  height: var(--page-height);
+  transform-style: preserve-3d;
+}
+
+.paper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  cursor: pointer;
+}
+
+.front, .back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+  background-color: #0a0a0a;
+  transform-style: preserve-3d;
+}
+
+.front {
+   padding-left: 6px; 
+   box-shadow: inset 25px 0 40px -20px rgba(0,0,0,0.6);
+}
+
+.back {
+  transform: rotateY(180deg);
+  padding-right: 6px;
+  box-shadow: inset -25px 0 40px -20px rgba(0,0,0,0.6);
+}
+
+.gloss {
+  position: absolute;
+  inset: 0;
+  background: 
+      linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.25) 45%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.25) 55%, transparent 65%),
+      linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, transparent 15%);
+  pointer-events: none; 
+  z-index: 30;
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+
+.panel-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.panel-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; 
+  display: block;
+  pointer-events: none;
+  background-color: #fff; 
+}
+
+.paper:first-child { 
+    box-shadow: 25px 25px 50px rgba(0,0,0,0.8);
+}
+.paper:first-child .front {
+   padding-left: 0;
+   box-shadow: none;
+}
+.paper:first-child .front::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 14px;
+    background: linear-gradient(to right, #0a0a0a, #333 20%, #666 30%, #333 50%, #0a0a0a 100%);
+    border-right: 1px solid #000;
+    z-index: 25; 
+    box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+}
+.paper:first-child .front::after {
+    content: ''; position: absolute; left: 14px; top: 0; bottom: 0; width: 4px;
+    background: linear-gradient(to right, rgba(0,0,0,0.7), transparent);
+    z-index: 25;
+}
+
+.paper:first-child .front .panel-container {
+    padding: 0;
+    background-color: #0a0a0a;
+    padding-left: 14px; 
+}
+.paper:first-child .front .panel-image {
+    object-fit: cover !important; 
+    width: 100% !important;
+    height: 100% !important;
+    background-color: #0a0a0a;
+}
+
+.sketch-mode {
+  background-color: #f0f0f0;
+  background-image: linear-gradient(45deg, #e0e0e0 25%, transparent 25%, transparent 75%, #e0e0e0 75%, #e0e0e0), linear-gradient(45deg, #e0e0e0 25%, transparent 25%, transparent 75%, #e0e0e0 75%, #e0e0e0);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+}
+
+.comic-btn {
+  font-family: 'Bangers', cursive;
+  letter-spacing: 1.5px;
+  border: 3px solid black;
+  box-shadow: 5px 5px 0px black;
+  transition: all 0.1s ease;
+  text-transform: uppercase;
+  cursor: pointer;
+  transform: translateZ(30px); 
+}
+.comic-btn:hover:not(:disabled) {
+  transform: translateZ(30px) translate(-2px, -2px);
+  box-shadow: 7px 7px 0px black;
+}
+.comic-btn:active:not(:disabled) {
+  transform: translateZ(30px) translate(3px, 3px);
+  box-shadow: 2px 2px 0px black;
+}
+.comic-btn:disabled {
+  filter: grayscale(80%); opacity: 0.7; cursor: wait;
+}
+
 /* 
   Comic Book Bubble Styles
   Ensures legible, aesthetic, and dynamic speech bubbles.
@@ -125,6 +329,13 @@
     box-shadow: 3px 3px 0 black;
 }
 
+@media (max-width: 768px) {
+    .control-btn {
+        width: 44px; /* Larger touch target on mobile */
+        height: 44px;
+    }
+}
+
 .control-btn:hover, .control-btn:focus-visible {
     transform: translate(-2px, -2px);
     box-shadow: 5px 5px 0 black;
@@ -151,4 +362,13 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #777;
+}
+
+/* Utility to hide scrollbar but allow scrolling */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
 }

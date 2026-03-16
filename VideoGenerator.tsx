@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ComicFace, Bubble } from './types';
 import { generateTTS } from './aiService';
 import { soundManager } from './SoundManager';
+import { t } from './translations';
 
 interface VideoGeneratorProps {
     comicFaces: ComicFace[];
     onClose: () => void;
+    lang: string;
 }
 
 interface Scene {
@@ -68,7 +70,7 @@ const TRANSITION_TYPES = [
     { id: 'zoom-out', name: 'Zoom Out' },
 ];
 
-export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onClose }) => {
+export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onClose, lang }) => {
     const [step, setStep] = useState<'idle' | 'configuring' | 'generating' | 'playing' | 'error'>('idle');
     const [error, setError] = useState<{ title: string; message: string; fatal: boolean } | null>(null);
     const [progress, setProgress] = useState(0);
@@ -502,11 +504,15 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                         ctx.beginPath();
                         ctx.rect(sx, sy, sw, sh);
                         ctx.clip();
+                        
+                        // Apply filters
+                        ctx.filter = 'contrast(125%) saturate(150%)';
                         ctx.drawImage(img, dx, dy, dw, dh);
+                        ctx.filter = 'none'; // Reset filter
                         
                         // Border
-                        ctx.strokeStyle = 'white';
-                        ctx.lineWidth = 4;
+                        ctx.strokeStyle = 'black';
+                        ctx.lineWidth = 8;
                         ctx.strokeRect(sx, sy, sw, sh);
                         ctx.restore();
                     });
@@ -517,11 +523,85 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                     if (f > 15) { // Delay bubbles slightly
                         const allBubbles = scene.panels.flatMap(p => p.bubbles);
                         allBubbles.forEach((b, idx) => {
-                            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                            ctx.fillRect(50, canvas.height - 150 - (idx * 60), canvas.width - 100, 50);
+                            const bubbleY = canvas.height - 150 - (idx * 70);
+                            const bubbleX = 50;
+                            const bubbleWidth = canvas.width - 100;
+                            const bubbleHeight = 60;
+                            
+                            // Bubble Background
+                            ctx.save();
+                            ctx.translate(bubbleX, bubbleY);
+                            ctx.rotate(-1 * Math.PI / 180); // -1 degree rotation
+                            
+                            // Shadow
+                            ctx.fillStyle = 'black';
+                            ctx.beginPath();
+                            if (ctx.roundRect) {
+                                ctx.roundRect(8, 8, bubbleWidth, bubbleHeight, [16, 16, 16, 0]);
+                            } else {
+                                ctx.rect(8, 8, bubbleWidth, bubbleHeight);
+                            }
+                            ctx.fill();
+                            
+                            // Tail shadow
+                            ctx.beginPath();
+                            ctx.moveTo(40 + 8, bubbleHeight + 8);
+                            ctx.lineTo(30 + 8, bubbleHeight + 20 + 8);
+                            ctx.lineTo(60 + 8, bubbleHeight + 8);
+                            ctx.fill();
+
+                            // Bubble
                             ctx.fillStyle = 'white';
-                            ctx.font = '24px "Comic Sans MS", cursive, sans-serif';
-                            ctx.fillText(`${b.character ? b.character + ': ' : ''}${b.text}`, 70, canvas.height - 115 - (idx * 60));
+                            ctx.strokeStyle = 'black';
+                            ctx.lineWidth = 4;
+                            
+                            ctx.beginPath();
+                            if (ctx.roundRect) {
+                                ctx.roundRect(0, 0, bubbleWidth, bubbleHeight, [16, 16, 16, 0]);
+                            } else {
+                                ctx.rect(0, 0, bubbleWidth, bubbleHeight);
+                            }
+                            ctx.fill();
+                            ctx.stroke();
+                            
+                            // Bubble Tail
+                            ctx.beginPath();
+                            ctx.moveTo(40, bubbleHeight);
+                            ctx.lineTo(30, bubbleHeight + 20);
+                            ctx.lineTo(60, bubbleHeight);
+                            ctx.fill();
+                            ctx.stroke();
+                            
+                            // Clear line between bubble and tail
+                            ctx.beginPath();
+                            ctx.moveTo(42, bubbleHeight);
+                            ctx.lineTo(58, bubbleHeight);
+                            ctx.strokeStyle = 'white';
+                            ctx.lineWidth = 6;
+                            ctx.stroke();
+                            
+                            // Text
+                            ctx.fillStyle = 'black';
+                            ctx.font = '900 24px "Comic Sans MS", cursive, sans-serif';
+                            ctx.textAlign = 'left';
+                            ctx.textBaseline = 'middle';
+                            
+                            let textX = 20;
+                            if (b.character) {
+                                const charText = b.character.toUpperCase() + ': ';
+                                // Drop shadow
+                                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                                ctx.fillText(charText, textX + 1, bubbleHeight / 2 + 1);
+                                // Main text
+                                ctx.fillStyle = '#DC2626'; // red-600
+                                ctx.fillText(charText, textX, bubbleHeight / 2);
+                                textX += ctx.measureText(charText).width + 10;
+                            }
+                            
+                            ctx.fillStyle = 'black';
+                            ctx.fillText(b.text, textX, bubbleHeight / 2);
+                            
+                            ctx.restore();
                         });
                     }
                     
@@ -640,95 +720,216 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 font-comic">
+        <div 
+            className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 md:p-8 font-comic overflow-hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="video-gen-title"
+        >
+            {/* Comic Halftone Background Pattern */}
+            <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 2px, transparent 2.5px)', backgroundSize: '10px 10px' }}></div>
+
             <audio ref={audioRef} />
             <audio ref={bgmAudioRef} />
             <audio ref={sfxAudioRef} />
             
             {step === 'idle' && (
-                <div className="bg-white p-8 border-4 border-black max-w-2xl w-full text-center shadow-[8px_8px_0px_rgba(255,255,255,0.2)]">
-                    <h2 className="text-3xl font-black mb-4 uppercase">Generate Video</h2>
-                    <p className="mb-6 text-gray-700">Transform your comic into an animated video with voiceovers, music, and transitions!</p>
+                <div className="bg-white p-6 md:p-10 border-[6px] md:border-[8px] border-black max-w-3xl w-full text-center shadow-[12px_12px_0px_rgba(255,255,0,1)] overflow-y-auto max-h-[90vh] relative transform rotate-1">
+                    <div className="absolute -top-6 -left-6 w-12 h-12 bg-red-500 border-4 border-black rounded-full flex items-center justify-center shadow-[4px_4px_0px_rgba(0,0,0,1)] z-10 transform -rotate-12">
+                        <span className="text-white font-black text-2xl">!</span>
+                    </div>
                     
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="text-left">
-                            <label className="block font-bold mb-1 text-sm">Layout Mode:</label>
-                            <select value={layoutMode} onChange={e => setLayoutMode(e.target.value as any)} className="w-full p-2 border-2 border-black font-comic text-sm">
-                                <option value="sequential">Single Panel (Sequential)</option>
-                                <option value="dynamic">Dynamic Mix (Asymmetrical)</option>
-                                <option value="full-page">Full Page Layouts</option>
+                    <h2 id="video-gen-title" className="text-4xl md:text-5xl font-black mb-6 uppercase tracking-tighter text-black drop-shadow-[3px_3px_0_rgba(255,0,0,1)] transform -skew-x-6">
+                        {t(lang, "GENERATE_VIDEO")}
+                    </h2>
+                    
+                    <div className="bg-yellow-100 border-4 border-black p-4 mb-8 shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -rotate-1">
+                        <p className="text-black font-bold text-base md:text-lg uppercase tracking-tight">{t(lang, "VIDEO_GEN_DESC")}</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 text-left">
+                        <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] transform rotate-1">
+                            <label htmlFor="layout-mode" className="block font-black mb-2 text-sm md:text-base uppercase tracking-widest text-red-600">{t(lang, "LAYOUT_MODE")}</label>
+                            <select 
+                                id="layout-mode"
+                                value={layoutMode} 
+                                onChange={e => setLayoutMode(e.target.value as any)} 
+                                className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-yellow-50 focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                            >
+                                <option value="sequential">{t(lang, "SEQUENTIAL")}</option>
+                                <option value="dynamic">{t(lang, "DYNAMIC")}</option>
+                                <option value="full-page">{t(lang, "FULL_PAGE")}</option>
                             </select>
                         </div>
-                        <div className="text-left">
-                            <label className="block font-bold mb-1 text-sm">Aspect Ratio:</label>
-                            <select value={aspectRatio} onChange={e => setAspectRatio(e.target.value)} className="w-full p-2 border-2 border-black font-comic text-sm">
+                        
+                        <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -rotate-1">
+                            <label htmlFor="aspect-ratio" className="block font-black mb-2 text-sm md:text-base uppercase tracking-widest text-blue-600">{t(lang, "ASPECT_RATIO")}</label>
+                            <select 
+                                id="aspect-ratio"
+                                value={aspectRatio} 
+                                onChange={e => setAspectRatio(e.target.value)} 
+                                className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-blue-50 focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                            >
                                 <option value="16:9">16:9 (Landscape)</option>
                                 <option value="9:16">9:16 (Vertical)</option>
                                 <option value="1:1">1:1 (Square)</option>
                             </select>
                         </div>
-                        <div className="text-left">
-                            <label className="block font-bold mb-1 text-sm">Global Pacing: {pacingMultiplier.toFixed(1)}x</label>
-                            <input type="range" min="0.5" max="3.0" step="0.1" value={pacingMultiplier} onChange={e => setPacingMultiplier(parseFloat(e.target.value))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-red-500" title="Adjusts the overall duration of all scenes" />
+                        
+                        <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] transform rotate-1">
+                            <label htmlFor="pacing-range" className="block font-black mb-2 text-sm md:text-base uppercase tracking-widest text-green-600 flex justify-between">
+                                <span>{t(lang, "GLOBAL_PACING")}</span>
+                                <span className="bg-black text-white px-2 py-1 text-xs">{pacingMultiplier.toFixed(1)}x</span>
+                            </label>
+                            <input 
+                                id="pacing-range"
+                                type="range" 
+                                min="0.5" 
+                                max="3.0" 
+                                step="0.1" 
+                                value={pacingMultiplier} 
+                                onChange={e => setPacingMultiplier(parseFloat(e.target.value))} 
+                                className="w-full h-4 bg-gray-200 border-2 border-black rounded-none appearance-none cursor-pointer accent-red-500" 
+                                title={t(lang, "PACING_TOOLTIP")} 
+                                aria-label={t(lang, "GLOBAL_PACING")}
+                            />
                         </div>
-                        <div className="text-left">
-                            <label className="block font-bold mb-1 text-sm">Dialogue Speed: {dialogueSpeed.toFixed(1)}x</label>
-                            <input type="range" min="0.5" max="2.0" step="0.1" value={dialogueSpeed} onChange={e => setDialogueSpeed(parseFloat(e.target.value))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-red-500" title="Affects how long panels with dialogue stay on screen" />
+                        
+                        <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -rotate-1">
+                            <label htmlFor="dialogue-speed" className="block font-black mb-2 text-sm md:text-base uppercase tracking-widest text-purple-600 flex justify-between">
+                                <span>{t(lang, "DIALOGUE_SPEED")}</span>
+                                <span className="bg-black text-white px-2 py-1 text-xs">{dialogueSpeed.toFixed(1)}x</span>
+                            </label>
+                            <input 
+                                id="dialogue-speed"
+                                type="range" 
+                                min="0.5" 
+                                max="2.0" 
+                                step="0.1" 
+                                value={dialogueSpeed} 
+                                onChange={e => setDialogueSpeed(parseFloat(e.target.value))} 
+                                className="w-full h-4 bg-gray-200 border-2 border-black rounded-none appearance-none cursor-pointer accent-red-500" 
+                                title={t(lang, "DIALOGUE_SPEED_TOOLTIP")} 
+                                aria-label={t(lang, "DIALOGUE_SPEED")}
+                            />
                         </div>
-                        <div className="text-left">
-                            <label className="block font-bold mb-1 text-sm">Transition:</label>
-                            <select value={transitionType} onChange={e => setTransitionType(e.target.value)} className="w-full p-2 border-2 border-black font-comic text-sm">
-                                <option value="random">Random Mix</option>
-                                <option value="cut">Hard Cut</option>
-                                <option value="fade">Fade</option>
-                                <option value="wipe">Wipe</option>
-                                <option value="comic-panel-slide">Comic Panel Slide</option>
-                                <option value="zoom-through">Zoom Through</option>
+                        
+                        <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] transform rotate-1">
+                            <label htmlFor="transition-type" className="block font-black mb-2 text-sm md:text-base uppercase tracking-widest text-orange-600">{t(lang, "TRANSITION")}</label>
+                            <select 
+                                id="transition-type"
+                                value={transitionType} 
+                                onChange={e => setTransitionType(e.target.value)} 
+                                className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-orange-50 focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                            >
+                                <option value="random">{t(lang, "RANDOM_MIX")}</option>
+                                {TRANSITION_TYPES.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
                             </select>
                         </div>
-                        <div className="text-left">
-                            <label className="block font-bold mb-1 text-sm">Trans. Duration: {transitionDuration.toFixed(1)}s</label>
-                            <input type="range" min="0.1" max="2.0" step="0.1" value={transitionDuration} onChange={e => setTransitionDuration(parseFloat(e.target.value))} className="w-full" />
+                        
+                        <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -rotate-1">
+                            <label htmlFor="transition-duration" className="block font-black mb-2 text-sm md:text-base uppercase tracking-widest text-pink-600 flex justify-between">
+                                <span>{t(lang, "TRANS_DURATION")}</span>
+                                <span className="bg-black text-white px-2 py-1 text-xs">{transitionDuration.toFixed(1)}s</span>
+                            </label>
+                            <input 
+                                id="transition-duration"
+                                type="range" 
+                                min="0.1" 
+                                max="2.0" 
+                                step="0.1" 
+                                value={transitionDuration} 
+                                onChange={e => setTransitionDuration(parseFloat(e.target.value))} 
+                                className="w-full h-4 bg-gray-200 border-2 border-black rounded-none appearance-none cursor-pointer accent-red-500"
+                                aria-label={t(lang, "TRANS_DURATION")}
+                            />
                         </div>
-                        <div className="text-left">
-                            <label className="block font-bold mb-1 text-sm">Background Music:</label>
-                            <select value={bgmTrack} onChange={e => setBgmTrack(e.target.value)} className="w-full p-2 border-2 border-black font-comic text-sm">
-                                <option value="">None</option>
-                                <option value="https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3">Action</option>
-                                <option value="https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3">Suspense</option>
-                                <option value="https://cdn.pixabay.com/download/audio/2022/01/21/audio_31743c58be.mp3">Comedy</option>
-                            </select>
+                        
+                        <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] transform rotate-1 md:col-span-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="bgm-track" className="block font-black mb-2 text-sm md:text-base uppercase tracking-widest text-teal-600">{t(lang, "BGM")}</label>
+                                    <select 
+                                        id="bgm-track"
+                                        value={bgmTrack} 
+                                        onChange={e => setBgmTrack(e.target.value)} 
+                                        className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-teal-50 focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                    >
+                                        <option value="">{t(lang, "NONE")}</option>
+                                        <option value="https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3">{t(lang, "ACTION")}</option>
+                                        <option value="https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3">{t(lang, "SUSPENSE")}</option>
+                                        <option value="https://cdn.pixabay.com/download/audio/2022/01/21/audio_31743c58be.mp3">{t(lang, "COMEDY")}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label htmlFor="bgm-volume" className="block font-black mb-2 text-sm md:text-base uppercase tracking-widest text-teal-600 flex justify-between">
+                                        <span>{t(lang, "BGM_VOLUME")}</span>
+                                        <span className="bg-black text-white px-2 py-1 text-xs">{Math.round(bgmVolume * 100)}%</span>
+                                    </label>
+                                    <input 
+                                        id="bgm-volume"
+                                        type="range" 
+                                        min="0" 
+                                        max="1" 
+                                        step="0.1" 
+                                        value={bgmVolume} 
+                                        onChange={e => setBgmVolume(parseFloat(e.target.value))} 
+                                        className="w-full h-4 bg-gray-200 border-2 border-black rounded-none appearance-none cursor-pointer accent-red-500 disabled:opacity-50" 
+                                        disabled={!bgmTrack} 
+                                        aria-label={t(lang, "BGM_VOLUME")}
+                                    />
+                                </div>
+                            </div>
                         </div>
-                        <div className="text-left">
-                            <label className="block font-bold mb-1 text-sm">BGM Volume: {Math.round(bgmVolume * 100)}%</label>
-                            <input type="range" min="0" max="1" step="0.1" value={bgmVolume} onChange={e => setBgmVolume(parseFloat(e.target.value))} className="w-full" disabled={!bgmTrack} />
-                        </div>
-                        <div className="text-left col-span-2 flex items-center gap-2">
-                            <input type="checkbox" id="sfxToggle" checked={sfxEnabled} onChange={e => setSfxEnabled(e.target.checked)} className="w-5 h-5" />
-                            <label htmlFor="sfxToggle" className="font-bold text-sm">Enable Auto Sound Effects (SFX)</label>
+                        
+                        <div className="bg-yellow-300 border-4 border-black p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -rotate-1 md:col-span-2 flex items-center justify-center gap-4 cursor-pointer hover:bg-yellow-400 transition-colors" onClick={() => setSfxEnabled(!sfxEnabled)}>
+                            <div className={`w-8 h-8 border-4 border-black flex items-center justify-center bg-white shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-transform ${sfxEnabled ? 'scale-110' : ''}`}>
+                                {sfxEnabled && <div className="w-4 h-4 bg-red-500 transform rotate-45"></div>}
+                            </div>
+                            <label htmlFor="sfxToggle" className="font-black text-lg md:text-xl uppercase tracking-widest cursor-pointer select-none">{t(lang, "ENABLE_SFX")}</label>
                         </div>
                     </div>
 
-                    <div className="flex gap-4 justify-center">
-                        <button onClick={onClose} className="px-4 py-2 border-4 border-black bg-gray-200 hover:bg-gray-300 font-bold uppercase">Cancel</button>
-                        <button onClick={prepareScenes} className="px-4 py-2 border-4 border-black bg-red-500 text-white hover:bg-red-600 font-bold uppercase shadow-[4px_4px_0px_black]">Next: Configure Scenes</button>
+                    <div className="flex flex-col md:flex-row gap-4 justify-center mt-8">
+                        <button 
+                            onClick={onClose} 
+                            className="px-8 py-3 border-[4px] border-black bg-white text-black font-black uppercase text-lg tracking-widest hover:bg-gray-200 active:scale-95 transition-all shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] transform rotate-1"
+                            aria-label="Cancel and close video generator"
+                        >{t(lang, "CANCEL")}</button>
+                        <button 
+                            onClick={prepareScenes} 
+                            className="px-8 py-3 border-[4px] border-black bg-red-500 text-white font-black uppercase text-lg tracking-widest hover:bg-red-400 active:scale-95 transition-all shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] transform -rotate-1"
+                            aria-label="Proceed to scene configuration"
+                        >{t(lang, "NEXT_CONFIG")}</button>
                     </div>
                 </div>
             )}
 
             {step === 'configuring' && (
-                <div className="bg-white p-6 border-4 border-black max-w-4xl w-full flex flex-col h-[90vh] shadow-[8px_8px_0px_rgba(255,255,255,0.2)]">
-                    <h2 className="text-2xl font-black mb-4 uppercase">Configure Scenes</h2>
+                <div 
+                    className="bg-white p-6 md:p-8 border-[6px] md:border-[8px] border-black max-w-5xl w-full flex flex-col h-[95vh] md:h-[90vh] shadow-[12px_12px_0px_rgba(255,255,0,1)] md:shadow-[20px_20px_0px_rgba(255,255,0,1)] relative overflow-hidden transform rotate-1"
+                    role="region"
+                    aria-labelledby="config-scenes-title"
+                >
+                    <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 2px, transparent 2.5px)', backgroundSize: '10px 10px' }}></div>
                     
-                    <div className="flex-1 overflow-y-auto pr-2 mb-6 space-y-4">
+                    <h2 id="config-scenes-title" className="font-comic text-4xl md:text-5xl mb-6 border-b-[6px] border-black pb-4 text-black uppercase tracking-tighter text-center bg-yellow-400 p-2 transform -skew-x-6 shadow-[4px_4px_0px_rgba(0,0,0,1)] relative z-10 drop-shadow-[2px_2px_0_rgba(255,0,0,1)]">{t(lang, "CONFIGURE_SCENES")}</h2>
+                    
+                    <div className="flex-1 overflow-y-auto pr-4 mb-8 space-y-8 custom-scrollbar relative z-10">
                         {scenes.map((scene, idx) => (
-                            <div key={scene.id} className="flex gap-4 p-3 border-2 border-black bg-gray-50 rounded-lg">
-                                <div className="w-32 h-32 flex-shrink-0 border-2 border-black overflow-hidden relative bg-black">
-                                    <div className="w-full h-full relative">
+                            <div key={scene.id} className="flex flex-col md:flex-row gap-6 p-6 border-[6px] border-black bg-white shadow-[8px_8px_0px_rgba(0,0,0,1)] transform -rotate-1 hover:rotate-0 transition-transform relative">
+                                <div className="absolute -top-4 -left-4 bg-red-500 text-white font-black font-comic text-2xl w-12 h-12 flex items-center justify-center border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -rotate-12 z-20">
+                                    {idx + 1}
+                                </div>
+                                
+                                <div className="w-full md:w-48 h-56 md:h-48 flex-shrink-0 border-[6px] border-black overflow-hidden relative bg-black shadow-[inset_4px_4px_0px_rgba(255,255,255,0.2)] transform rotate-2">
+                                    <div className="w-full h-full relative" aria-hidden="true">
                                         {(LAYOUT_TEMPLATES[scene.layout] || LAYOUT_TEMPLATES.single).slots.map((slot, sIdx) => (
                                             <div 
                                                 key={sIdx}
-                                                className="absolute border border-white/30 overflow-hidden"
+                                                className="absolute border-4 border-black overflow-hidden bg-white"
                                                 style={{
                                                     left: `${slot.x}%`,
                                                     top: `${slot.y}%`,
@@ -737,44 +938,49 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                                 }}
                                             >
                                                 {scene.panels[sIdx] && (
-                                                    <img src={scene.panels[sIdx].imageUrl} alt="Panel" className="w-full h-full object-cover" />
+                                                    <img src={scene.panels[sIdx].imageUrl} alt="" className="w-full h-full object-cover filter contrast-125 saturate-150" />
                                                 )}
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="absolute top-0 left-0 bg-black text-white px-1.5 py-0.5 text-[10px] font-bold">#{idx + 1}</div>
                                 </div>
                                 
-                                <div className="flex-1 grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-bold uppercase mb-1">Layout</label>
+                                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="bg-yellow-100 p-4 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform rotate-1">
+                                        <label htmlFor={`layout-${idx}`} className="block font-comic text-lg md:text-xl font-black uppercase mb-2 tracking-widest text-red-600">{t(lang, "LAYOUT")}</label>
                                         <select 
+                                            id={`layout-${idx}`}
                                             value={scene.layout} 
                                             onChange={e => {
                                                 const newScenes = [...scenes];
                                                 newScenes[idx].layout = e.target.value;
                                                 setScenes(newScenes);
                                             }}
-                                            className="w-full p-1 border-2 border-black text-sm"
+                                            className="w-full p-3 border-4 border-black font-comic font-bold text-base md:text-lg bg-white focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                            aria-label={`Layout for scene ${idx + 1}`}
                                         >
                                             {Object.keys(LAYOUT_TEMPLATES).filter(l => {
                                                 const slots = LAYOUT_TEMPLATES[l].slots.length;
                                                 return slots >= scene.panels.length;
                                             }).map(l => (
-                                                <option key={l} value={l}>{l.replace('-', ' ')}</option>
+                                                <option key={l} value={l}>{l.replace('-', ' ').toUpperCase()}</option>
                                             ))}
                                         </select>
                                     </div>
                                     
-                                    <div>
-                                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">Description</p>
-                                        <p className="text-sm italic truncate">{scene.panels.map(p => p.description).filter(Boolean).join(', ') || 'No description'}</p>
+                                    <div className="bg-blue-100 p-4 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -rotate-1">
+                                        <p className="font-comic text-lg md:text-xl font-black text-blue-800 uppercase mb-2 tracking-widest">{t(lang, "DESCRIPTION")}</p>
+                                        <p className="font-sans font-bold text-sm md:text-base italic truncate bg-white p-3 border-4 border-black shadow-[inset_2px_2px_0px_rgba(0,0,0,0.1)]">{scene.panels.map(p => p.description).filter(Boolean).join(', ') || t(lang, "NO_DESCRIPTION")}</p>
                                     </div>
                                     
-                                    <div>
-                                        <label className="block text-xs font-bold uppercase mb-1">Duration: {(scene.duration / 1000).toFixed(1)}s</label>
-                                        <div className="flex items-center gap-2">
+                                    <div className="bg-green-100 p-4 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform rotate-1 sm:col-span-2 md:col-span-1">
+                                        <label htmlFor={`duration-${idx}`} className="block font-comic text-lg md:text-xl font-black uppercase mb-2 tracking-widest text-green-800 flex justify-between items-center">
+                                            <span>{t(lang, "DURATION")}</span>
+                                            <span className="bg-black text-white px-2 py-1 text-sm">{(scene.duration / 1000).toFixed(1)}s</span>
+                                        </label>
+                                        <div className="flex items-center gap-4">
                                             <input 
+                                                id={`duration-${idx}`}
                                                 type="range" 
                                                 min="1000" 
                                                 max="15000" 
@@ -785,7 +991,8 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                                     newScenes[idx].duration = parseInt(e.target.value);
                                                     setScenes(newScenes);
                                                 }}
-                                                className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                                className="flex-1 h-4 bg-gray-200 border-2 border-black rounded-none appearance-none cursor-pointer accent-red-500"
+                                                aria-label={`Duration for scene ${idx + 1}`}
                                             />
                                             <input 
                                                 type="number" 
@@ -795,31 +1002,38 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                                     newScenes[idx].duration = parseInt(e.target.value) || 1000;
                                                     setScenes(newScenes);
                                                 }}
-                                                className="w-16 p-0.5 border-2 border-black text-[10px] font-bold text-center"
+                                                className="w-24 p-2 border-4 border-black font-comic text-base md:text-lg font-black text-center bg-white focus:ring-4 focus:ring-red-500 outline-none shadow-[2px_2px_0px_rgba(0,0,0,1)]"
+                                                aria-label={`Numeric duration for scene ${idx + 1}`}
                                             />
                                         </div>
                                     </div>
                                     
-                                    <div>
-                                        <label className="block text-xs font-bold uppercase mb-1">Transition</label>
+                                    <div className="bg-pink-100 p-4 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -rotate-1 sm:col-span-2 md:col-span-1">
+                                        <label htmlFor={`transition-${idx}`} className="block font-comic text-lg md:text-xl font-black uppercase mb-2 tracking-widest text-pink-800">{t(lang, "TRANSITION")}</label>
                                         <select 
+                                            id={`transition-${idx}`}
                                             value={scene.transition} 
                                             onChange={e => {
                                                 const newScenes = [...scenes];
                                                 newScenes[idx].transition = e.target.value;
                                                 setScenes(newScenes);
                                             }}
-                                            className="w-full p-1 border-2 border-black text-sm"
+                                            className="w-full p-3 border-4 border-black font-comic font-bold text-base md:text-lg bg-white focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                            aria-label={`Transition for scene ${idx + 1}`}
                                         >
                                             {TRANSITION_TYPES.map(t => (
-                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                                <option key={t.id} value={t.id}>{t.name.toUpperCase()}</option>
                                             ))}
                                         </select>
                                     </div>
                                     
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-bold uppercase mb-1">Animation Intensity: {Math.round(scene.animationIntensity * 100)}%</label>
+                                    <div className="bg-purple-100 p-4 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform rotate-1 sm:col-span-2">
+                                        <label htmlFor={`intensity-${idx}`} className="block font-comic text-lg md:text-xl font-black uppercase mb-2 tracking-widest text-purple-800 flex justify-between items-center">
+                                            <span>{t(lang, "ANIMATION_INTENSITY")}</span>
+                                            <span className="bg-black text-white px-2 py-1 text-sm">{Math.round(scene.animationIntensity * 100)}%</span>
+                                        </label>
                                         <input 
+                                            id={`intensity-${idx}`}
                                             type="range" 
                                             min="0" 
                                             max="1" 
@@ -830,14 +1044,16 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                                 newScenes[idx].animationIntensity = parseFloat(e.target.value);
                                                 setScenes(newScenes);
                                             }}
-                                            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                            className="w-full h-4 bg-gray-200 border-2 border-black rounded-none appearance-none cursor-pointer accent-red-500"
+                                            aria-label={`Animation intensity for scene ${idx + 1}`}
                                         />
                                     </div>
 
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-bold uppercase mb-1">Sound Effect (SFX)</label>
-                                        <div className="flex gap-2">
+                                    <div className="bg-orange-100 p-4 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -rotate-1 sm:col-span-2">
+                                        <label htmlFor={`sfx-${idx}`} className="block font-comic text-lg md:text-xl font-black uppercase mb-2 tracking-widest text-orange-800">{t(lang, "SFX")}</label>
+                                        <div className="flex gap-4">
                                             <select 
+                                                id={`sfx-${idx}`}
                                                 value={scene.sfxId || 'none'} 
                                                 onChange={e => {
                                                     const newScenes = [...scenes];
@@ -846,10 +1062,11 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                                     newScenes[idx].sfxUrl = sfx?.url || '';
                                                     setScenes(newScenes);
                                                 }}
-                                                className="flex-1 p-1 border-2 border-black text-sm"
+                                                className="flex-1 p-3 border-4 border-black font-comic font-bold text-base md:text-lg bg-white focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                                aria-label={`Sound effect for scene ${idx + 1}`}
                                             >
                                                 {SFX_LIBRARY.map(s => (
-                                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                                    <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>
                                                 ))}
                                             </select>
                                             <button 
@@ -861,14 +1078,15 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                                     }
                                                 }}
                                                 disabled={!scene.sfxUrl}
-                                                className="px-2 border-2 border-black bg-white hover:bg-gray-100 disabled:opacity-50"
-                                                title="Preview SFX"
+                                                className="px-6 border-4 border-black bg-yellow-400 hover:bg-yellow-300 disabled:opacity-50 active:scale-95 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] disabled:hover:translate-y-0 disabled:hover:translate-x-0 disabled:hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] flex items-center justify-center"
+                                                title={t(lang, "PREVIEW_SFX")}
+                                                aria-label={`Preview sound effect for scene ${idx + 1}`}
                                             >
-                                                🔊
+                                                <span className="text-3xl drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">🔊</span>
                                             </button>
                                         </div>
                                         {scene.sfxId !== 'none' && (
-                                            <p className="text-[10px] text-indigo-600 font-bold mt-1 uppercase">Suggested based on content</p>
+                                            <p className="font-comic text-sm md:text-base text-black font-black mt-4 uppercase tracking-widest bg-yellow-300 inline-block px-3 py-1 border-4 border-black transform rotate-2 shadow-[2px_2px_0px_rgba(0,0,0,1)]">{t(lang, "SUGGESTED_SFX")}</p>
                                         )}
                                     </div>
                                 </div>
@@ -876,70 +1094,108 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                         ))}
                     </div>
                     
-                    <div className="flex gap-4 justify-center pt-4 border-t-2 border-black">
-                        <button onClick={() => setStep('idle')} className="px-6 py-2 border-4 border-black bg-gray-200 hover:bg-gray-300 font-bold uppercase">Back</button>
-                        <button onClick={generateVideo} className="px-6 py-2 border-4 border-black bg-red-500 text-white hover:bg-red-600 font-bold uppercase shadow-[4px_4px_0px_black]">Generate Final Video</button>
+                    <div className="flex flex-col sm:flex-row gap-4 md:gap-6 justify-center pt-8 border-t-[8px] border-black relative z-10 bg-white p-6 mx-[-24px] md:mx-[-32px] mb-[-24px] md:mb-[-32px]">
+                        <button 
+                            onClick={() => setStep('idle')} 
+                            className="px-8 py-4 border-[6px] border-black bg-white text-black font-comic font-black uppercase text-xl md:text-2xl shadow-[8px_8px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_rgba(0,0,0,1)] active:scale-95 transition-all transform rotate-1 tracking-widest"
+                            aria-label="Back to general settings"
+                        >{t(lang, "BACK")}</button>
+                        <button 
+                            onClick={generateVideo} 
+                            className="px-8 py-4 border-[6px] border-black bg-red-500 text-white hover:bg-red-400 font-comic font-black uppercase text-xl md:text-2xl shadow-[8px_8px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_rgba(0,0,0,1)] active:scale-95 transition-all transform -rotate-1 tracking-widest"
+                            aria-label="Generate final video"
+                        >{t(lang, "GENERATE_FINAL")}</button>
                     </div>
                 </div>
             )}
 
             {step === 'generating' && (
-                <div className="bg-white p-8 border-4 border-black max-w-md w-full text-center shadow-[8px_8px_0px_rgba(255,255,255,0.2)]">
-                    <h2 className="text-2xl font-black mb-4 uppercase animate-pulse">Processing...</h2>
-                    <div className="w-full h-8 border-4 border-black bg-gray-200 relative overflow-hidden mb-4">
-                        <div className="absolute top-0 left-0 bottom-0 bg-green-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+                <div 
+                    className="bg-white p-8 md:p-12 border-[6px] md:border-[8px] border-black max-w-xl w-full text-center shadow-[12px_12px_0px_rgba(255,255,255,1)] md:shadow-[20px_20px_0px_rgba(255,255,255,1)] transform rotate-2 relative overflow-hidden"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 2px, transparent 2.5px)', backgroundSize: '10px 10px' }}></div>
+                    <div className="w-24 h-24 md:w-32 md:h-32 border-[8px] md:border-[10px] border-black border-t-red-500 rounded-full animate-spin mx-auto mb-8 shadow-[4px_4px_0px_rgba(0,0,0,0.2)]"></div>
+                    <h2 className="font-comic text-3xl md:text-4xl font-black mb-6 uppercase tracking-tighter text-black bg-yellow-400 inline-block px-4 py-2 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -skew-x-6">{t(lang, "GENERATING_VIDEO")}</h2>
+                    <p className="font-sans font-bold text-gray-800 mb-8 text-base md:text-lg bg-white p-4 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform rotate-1">{t(lang, "GENERATING_DESC")}</p>
+                    <div className="w-full bg-white border-4 border-black h-8 md:h-10 rounded-none overflow-hidden relative shadow-[inset_4px_4px_0px_rgba(0,0,0,0.1)] transform -rotate-1">
+                        <div 
+                            className="h-full bg-red-500 transition-all duration-500 border-r-4 border-black" 
+                            style={{ width: `${progress}%` }}
+                            role="progressbar"
+                            aria-valuenow={progress}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                        ></div>
+                        <div className="absolute inset-0 flex items-center justify-center font-comic text-lg md:text-xl font-black uppercase tracking-widest text-black mix-blend-overlay drop-shadow-[1px_1px_0_rgba(255,255,255,1)]">
+                            {progress}%
+                        </div>
                     </div>
-                    <p className="font-bold text-sm mb-2">{statusText}</p>
-                    <p className="text-xs text-gray-500 italic">This may take a minute depending on comic length.</p>
+                    <p className="font-comic font-black text-lg mt-6 uppercase tracking-tight text-black bg-blue-200 inline-block px-4 py-2 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform rotate-2">{statusText}</p>
                 </div>
             )}
 
             {step === 'error' && (
-                <div className="bg-white p-8 border-4 border-black max-w-md w-full text-center shadow-[8px_8px_0px_rgba(255,255,255,0.2)]">
-                    <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-600">
-                        <span className="text-3xl font-black">!</span>
+                <div 
+                    className="bg-white p-8 md:p-12 border-[6px] md:border-[8px] border-black max-w-md w-full text-center shadow-[12px_12px_0px_rgba(255,255,255,1)] md:shadow-[20px_20px_0px_rgba(255,255,255,1)] transform -rotate-2 relative overflow-hidden"
+                    role="alert"
+                >
+                    <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 2px, transparent 2.5px)', backgroundSize: '10px 10px' }}></div>
+                    <div className="w-20 h-20 md:w-24 md:h-24 bg-red-500 text-white rounded-full flex items-center justify-center mx-auto mb-8 border-[6px] md:border-[8px] border-black shadow-[6px_6px_0px_rgba(0,0,0,1)] transform rotate-6">
+                        <span className="font-comic text-5xl md:text-6xl font-black drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">!</span>
                     </div>
-                    <h2 className="text-2xl font-black mb-2 uppercase text-red-600">{error?.title || 'Error'}</h2>
-                    <p className="mb-6 text-gray-700">{error?.message || 'An unexpected error occurred.'}</p>
+                    <h2 className="font-comic text-3xl md:text-4xl font-black mb-4 uppercase text-black bg-red-400 inline-block px-4 py-2 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform skew-x-6 tracking-tighter">{error?.title || t(lang, "ERROR")}</h2>
+                    <p className="mb-8 font-sans font-bold text-gray-800 text-base md:text-lg bg-white p-4 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform -rotate-1">{error?.message || t(lang, "UNEXPECTED_ERROR")}</p>
                     
-                    <div className="flex gap-4 justify-center">
+                    <div className="flex flex-col sm:flex-row gap-4 md:gap-6 justify-center">
                         <button 
                             onClick={() => {
                                 setError(null);
                                 setStep('configuring');
                             }} 
-                            className="px-4 py-2 border-4 border-black bg-gray-200 hover:bg-gray-300 font-bold uppercase"
+                            className="px-8 py-3 border-[4px] border-black bg-gray-300 hover:bg-gray-200 font-comic font-black uppercase text-xl shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] active:scale-95 transition-all transform rotate-1"
+                            aria-label="Return to configuration settings"
                         >
-                            Back to Config
+                            {t(lang, "BACK_TO_CONFIG")}
                         </button>
                         <button 
                             onClick={generateVideo} 
-                            className="px-4 py-2 border-4 border-black bg-red-500 text-white hover:bg-red-600 font-bold uppercase shadow-[4px_4px_0px_black]"
+                            className="px-8 py-3 border-[4px] border-black bg-red-500 text-white hover:bg-red-400 font-comic font-black uppercase text-xl shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] active:scale-95 transition-all transform -rotate-1"
+                            aria-label="Retry video generation"
                         >
-                            Retry
+                            {t(lang, "RETRY")}
                         </button>
                     </div>
                 </div>
             )}
 
             {step === 'playing' && scenes.length > 0 && (
-                <div className={`relative w-full max-w-4xl bg-black border-4 border-white overflow-hidden shadow-[0_0_50px_rgba(255,255,255,0.2)] ${aspectRatio === '16:9' ? 'aspect-video' : aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[80vh]' : 'aspect-square max-h-[80vh]'}`}>
-                    <AnimatePresence mode="wait">
+                <div 
+                    className="flex flex-col items-center w-full max-w-5xl h-full md:h-auto"
+                    role="region"
+                    aria-labelledby="video-player-title"
+                >
+                    <h2 id="video-player-title" className="sr-only">{t(lang, "VIDEO_PLAYER")}</h2>
+                    
+                    <div className={`relative w-full bg-black border-[6px] md:border-[8px] border-black overflow-hidden shadow-[12px_12px_0px_rgba(255,255,255,1)] md:shadow-[20px_20px_0px_rgba(255,255,255,1)] transform rotate-1 ${aspectRatio === '16:9' ? 'aspect-video' : aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[60vh] md:max-h-[70vh]' : 'aspect-square max-h-[60vh] md:max-h-[70vh]'}`}>
+                        <AnimatePresence mode="wait">
                         <motion.div 
                             key={currentSceneIndex}
                             {...renderTransition(scenes[currentSceneIndex].transition)}
                             transition={{ duration: scenes[currentSceneIndex].transition === 'cut' ? 0 : transitionDuration }}
                             className="absolute inset-0 flex items-center justify-center"
+                            aria-live="polite"
                         >
                             {/* Layout Rendering */}
-                            <div className="absolute inset-0 w-full h-full">
+                            <div className="absolute inset-0 w-full h-full" aria-hidden="true">
                                 {(LAYOUT_TEMPLATES[scenes[currentSceneIndex].layout] || LAYOUT_TEMPLATES.single).slots.map((slot, sIdx) => {
                                     const panel = scenes[currentSceneIndex].panels[sIdx];
                                     if (!panel) return null;
                                     return (
                                         <motion.div
                                             key={sIdx}
-                                            className="absolute overflow-hidden border-2 border-white"
+                                            className="absolute overflow-hidden border-[4px] md:border-[6px] border-black"
                                             style={{
                                                 left: `${slot.x}%`,
                                                 top: `${slot.y}%`,
@@ -950,7 +1206,7 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                             <motion.img 
                                                 src={panel.imageUrl} 
                                                 alt="Scene"
-                                                className="w-full h-full object-cover"
+                                                className="w-full h-full object-cover filter contrast-125 saturate-150"
                                                 initial={{ scale: 1 }}
                                                 animate={{ 
                                                     scale: 1 + (scenes[currentSceneIndex].animationIntensity * 0.1), 
@@ -965,38 +1221,43 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                             </div>
                             
                             {/* Captions / Bubbles */}
+                            <div className="sr-only">
+                                {scenes[currentSceneIndex].panels.map(p => p.description).join('. ')}
+                            </div>
                             {scenes[currentSceneIndex].panels.flatMap(p => p.bubbles).map((bubble, idx) => (
                                 <motion.div 
                                     key={idx}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.5 + (idx * 1.5) }}
-                                    className="absolute bottom-10 left-10 right-10 bg-black/70 text-white p-4 border-2 border-white text-xl text-center font-bold z-10"
+                                    initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    transition={{ delay: 0.5 + (idx * 1.5), type: "spring", stiffness: 200, damping: 15 }}
+                                    className="absolute bottom-8 md:bottom-12 left-6 md:left-12 right-6 md:right-12 bg-white text-black p-4 md:p-6 border-[4px] border-black font-comic text-xl md:text-2xl text-center font-black z-10 shadow-[8px_8px_0px_rgba(0,0,0,1)] transform -rotate-1 rounded-2xl rounded-bl-none"
+                                    aria-live="assertive"
                                 >
-                                    {bubble.character && <span className="text-yellow-400 mr-2">{bubble.character}:</span>}
+                                    {bubble.character && <span className="text-red-600 mr-3 uppercase tracking-tighter drop-shadow-[1px_1px_0_rgba(0,0,0,0.2)]">{bubble.character}:</span>}
                                     {bubble.text}
+                                    <div className="absolute -bottom-[20px] left-[-4px] w-8 h-8 bg-white border-l-[4px] border-b-[4px] border-black transform -skew-x-[30deg] origin-top-left -z-10"></div>
                                 </motion.div>
                             ))}
                         </motion.div>
                     </AnimatePresence>
 
                     {/* Controls */}
-                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent flex justify-between items-center">
-                        <div className="text-white font-bold">
-                            Scene {currentSceneIndex + 1} / {scenes.length}
+                    <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black via-black/80 to-transparent flex justify-between items-center z-20">
+                        <div className="text-white font-comic font-black text-xl md:text-2xl drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">
+                            SCENE {currentSceneIndex + 1} / {scenes.length}
                         </div>
                         
                         {error && !error.fatal && (
-                            <div className="absolute top-[-60px] left-4 right-4 bg-red-500 text-white p-2 border-2 border-white text-xs font-bold flex justify-between items-center animate-bounce">
-                                <span>⚠️ {error.message}</span>
-                                <button onClick={() => setError(null)} className="ml-2 bg-white text-red-500 px-1 rounded">X</button>
+                            <div className="absolute top-[-80px] left-4 right-4 bg-red-500 text-white p-3 border-4 border-black text-sm md:text-base font-comic font-black flex justify-between items-center animate-bounce shadow-[6px_6px_0px_rgba(0,0,0,1)] transform -rotate-1">
+                                <span><span className="text-2xl drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">⚠️</span> {error.message}</span>
+                                <button onClick={() => setError(null)} className="ml-4 bg-white text-black border-2 border-black px-2 py-1 hover:bg-gray-200 active:scale-95 shadow-[2px_2px_0px_rgba(0,0,0,1)]">X</button>
                             </div>
                         )}
 
-                        <div className="flex gap-4 items-center">
+                        <div className="flex gap-3 md:gap-4 items-center">
                             {isExporting ? (
-                                <div className="text-white font-bold text-sm bg-black/50 px-2 py-1 rounded">
-                                    Exporting... {Math.round(exportProgress)}%
+                                <div className="text-black font-comic font-black text-sm md:text-base bg-yellow-400 px-4 py-2 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transform rotate-1">
+                                    {t(lang, "EXPORTING")}... {Math.round(exportProgress)}%
                                 </div>
                             ) : (
                                 <button 
@@ -1004,9 +1265,10 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                         stopPlayback();
                                         exportVideo();
                                     }} 
-                                    className="bg-green-500 text-white px-4 py-1 rounded font-bold hover:bg-green-600"
+                                    className="bg-green-400 text-black border-4 border-black px-4 md:px-6 py-2 font-comic font-black text-sm md:text-base uppercase tracking-widest hover:bg-green-300 active:scale-95 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] transform -rotate-1"
+                                    aria-label={t(lang, "EXPORT_VIDEO_DESC")}
                                 >
-                                    Export WebM
+                                    {t(lang, "EXPORT_WEBM")}
                                 </button>
                             )}
                             <button 
@@ -1014,13 +1276,21 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                     if (isPlaying) stopPlayback();
                                     else playScene(currentSceneIndex, scenes);
                                 }} 
-                                className="bg-white text-black px-4 py-1 rounded font-bold hover:bg-gray-200"
+                                className="bg-white text-black border-4 border-black px-4 md:px-6 py-2 font-comic font-black text-sm md:text-base uppercase tracking-widest hover:bg-gray-200 active:scale-95 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] transform rotate-1"
+                                aria-label={isPlaying ? t(lang, "PAUSE_VIDEO") : t(lang, "PLAY_VIDEO")}
                             >
-                                {isPlaying ? 'Pause' : 'Play'}
+                                {isPlaying ? t(lang, "PAUSE") : t(lang, "PLAY")}
                             </button>
-                            <button onClick={onClose} className="bg-red-500 text-white px-4 py-1 rounded font-bold hover:bg-red-600">Close</button>
+                            <button 
+                                onClick={onClose} 
+                                className="bg-red-500 text-white border-4 border-black px-4 md:px-6 py-2 font-comic font-black text-sm md:text-base uppercase tracking-widest hover:bg-red-400 active:scale-95 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] transform -rotate-1"
+                                aria-label={t(lang, "CLOSE_PLAYER")}
+                            >
+                                {t(lang, "CLOSE")}
+                            </button>
                         </div>
                     </div>
+                </div>
                 </div>
             )}
         </div>

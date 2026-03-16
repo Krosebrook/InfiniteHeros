@@ -455,6 +455,10 @@ const InfiniteHeroesGame: React.FC = () => {
             } else if (type === 'back_cover') {
                 const img = await aiService.generateImage("Epic back cover", selectedArtStyle, selectedGenre, hero, friend, villain, worldStateRef.current, '3:4');
                 updateFaceState(faceId, { imageUrl: img, isLoading: false });
+            } else if (type === 'cover') {
+                const dynamicTitle = await aiService.generateComicTitle(hero!.name, selectedGenre, langName);
+                const img = await aiService.generateCoverImage(dynamicTitle, "Flash Comics", selectedArtStyle, selectedGenre, hero, friend, villain, worldStateRef.current, '3:4');
+                updateFaceState(faceId, { imageUrl: img, isLoading: false, panels: [], bubbles: [] });
             } else {
                 const beat = await aiService.generateBeat(pageNum, historyRef.current, hero!, friend, villain, selectedGenre, storyTone, langName, customPremise, richMode, isDecision, worldStateRef.current, rollResult, selectedLayout);
                 await updateWorldState(beat.world_update);
@@ -462,7 +466,7 @@ const InfiniteHeroesGame: React.FC = () => {
                 const panelPromises = beat.panels.map(async (p, i) => ({
                     id: `${faceId}-p${i}`,
                     description: p.description,
-                    imageUrl: await aiService.generateImage(p.description, selectedArtStyle, selectedGenre, hero, friend, villain, worldStateRef.current, type === 'cover' ? '3:4' : '1:1')
+                    imageUrl: await aiService.generateImage(p.description, selectedArtStyle, selectedGenre, hero, friend, villain, worldStateRef.current, '1:1')
                 }));
                 const generatedPanels = await Promise.all(panelPromises);
                 
@@ -511,33 +515,7 @@ const InfiniteHeroesGame: React.FC = () => {
         updateFaceState(coverFace.id, { isLoading: true });
         
         try {
-            const langName = LANGUAGES.find(l => l.code === selectedLanguage)?.name || "English";
-            const beat = await aiService.generateBeat(0, historyRef.current, hero, friend, villain, "Superhero Action", storyTone, langName, customPremise, richMode, false, worldStateRef.current, undefined, 'single');
-            
-            const panelPromises = beat.panels.map(async (p, i) => ({
-                id: `${coverFace.id}-p${i}`,
-                description: p.description,
-                imageUrl: await aiService.generateImage(p.description, "Painting (Alex Ross Style)", "Superhero Action", hero, friend, villain, worldStateRef.current, '3:4')
-            }));
-            const generatedPanels = await Promise.all(panelPromises);
-            
-            const allBubbles: any[] = [];
-            beat.panels.forEach((p, i) => {
-                 const bubbles = p.bubbles.map(b => ({ 
-                     ...b, 
-                     id: uuidv4(), 
-                     x: 50, y: 50, 
-                     tailX: 50, tailY: 80 
-                 })); 
-                 allBubbles.push(...bubbles);
-            });
-
-            updateFaceState(coverFace.id, { 
-                narrative: beat, 
-                panels: generatedPanels, 
-                bubbles: allBubbles,
-                isLoading: false 
-            });
+            await generateSinglePage(coverFace.id, 0, 'cover');
         } catch (e) {
             handleAPIError(e);
             updateFaceState(coverFace.id, { isLoading: false });
@@ -656,40 +634,102 @@ const InfiniteHeroesGame: React.FC = () => {
                 hasSave={hasSave} onResume={handleResume}
                 onHeroUpload={async f => {
                     const dataUrl = await handleFileUpload(f);
+                    const mimeType = dataUrl.split(';')[0].split(':')[1];
                     const base64 = dataUrl.split(',')[1];
-                    const desc = await aiService.describeCharacter(base64);
-                    setHero({ base64, desc, name: "Traveler", backstory: desc });
+                    const langName = LANGUAGES.find(l => l.code === selectedLanguage)?.name || "English";
+                    const details = await aiService.generateCharacterDetailsFromImage(base64, selectedGenre, langName, mimeType);
+                    setHero({ base64, mimeType, desc: details.backstory, name: details.name, backstory: details.backstory });
                 }}
                 onFriendUpload={async f => {
                     const dataUrl = await handleFileUpload(f);
+                    const mimeType = dataUrl.split(';')[0].split(':')[1];
                     const base64 = dataUrl.split(',')[1];
-                    const desc = await aiService.describeCharacter(base64);
-                    setFriend({ base64, desc, name: "Ally", backstory: desc });
+                    const langName = LANGUAGES.find(l => l.code === selectedLanguage)?.name || "English";
+                    const details = await aiService.generateCharacterDetailsFromImage(base64, selectedGenre, langName, mimeType);
+                    setFriend({ base64, mimeType, desc: details.backstory, name: details.name, backstory: details.backstory });
                 }}
                 onVillainUpload={async f => {
                     const dataUrl = await handleFileUpload(f);
+                    const mimeType = dataUrl.split(';')[0].split(':')[1];
                     const base64 = dataUrl.split(',')[1];
-                    const desc = await aiService.describeCharacter(base64);
-                    setVillain({ base64, desc, name: "Nemesis", backstory: desc });
+                    const langName = LANGUAGES.find(l => l.code === selectedLanguage)?.name || "English";
+                    const details = await aiService.generateCharacterDetailsFromImage(base64, selectedGenre, langName, mimeType);
+                    setVillain({ base64, mimeType, desc: details.backstory, name: details.name, backstory: details.backstory });
                 }}
                 onAutoGenerateHero={async () => {
-                    let desc = GENRE_CHARACTER_PROMPTS[selectedGenre]?.hero;
-                    if (selectedGenre === 'Custom' && customPremise) {
-                        desc = `A protagonist for a story about: ${customPremise}`;
-                    } else if (!desc) {
-                        desc = GENRE_CHARACTER_PROMPTS['Custom'].hero;
+                    console.log("Auto-generating hero. Current hero:", heroRef.current);
+                    if (heroRef.current?.base64) {
+                        // If image exists, regenerate description from it
+                        soundManager.play('magic');
+                        try {
+                            const langName = LANGUAGES.find(l => l.code === selectedLanguage)?.name || "English";
+                            const details = await aiService.generateCharacterDetailsFromImage(heroRef.current.base64, selectedGenre, langName, heroRef.current.mimeType);
+                            setHero({ ...heroRef.current, desc: details.backstory, name: details.name, backstory: details.backstory });
+                        } catch (e) {
+                            console.error("Failed to describe hero image", e);
+                            handleAPIError(e);
+                            throw e;
+                        }
+                    } else {
+                        // Otherwise generate a new persona from scratch
+                        let desc = GENRE_CHARACTER_PROMPTS[selectedGenre]?.hero;
+                        if (selectedGenre === 'Custom' && customPremise) {
+                            desc = `A protagonist for a story about: ${customPremise}`;
+                        } else if (!desc) {
+                            desc = GENRE_CHARACTER_PROMPTS['Custom'].hero;
+                        }
+                        try {
+                            setHero(await aiService.generatePersona(desc, selectedArtStyle, selectedGenre));
+                        } catch (e) {
+                            console.error("Failed to generate hero persona", e);
+                            handleAPIError(e);
+                            throw e;
+                        }
                     }
-                    setHero(await aiService.generatePersona(desc, selectedArtStyle, selectedGenre));
                 }}
                 onAutoGenerateFriend={async () => {
-                    let desc = GENRE_CHARACTER_PROMPTS[selectedGenre]?.friend;
-                    if (!desc) desc = GENRE_CHARACTER_PROMPTS['Custom'].friend;
-                    setFriend(await aiService.generatePersona(desc, selectedArtStyle, selectedGenre));
+                    if (friendRef.current?.base64) {
+                        soundManager.play('magic');
+                        try {
+                            const langName = LANGUAGES.find(l => l.code === selectedLanguage)?.name || "English";
+                            const details = await aiService.generateCharacterDetailsFromImage(friendRef.current.base64, selectedGenre, langName, friendRef.current.mimeType);
+                            setFriend({ ...friendRef.current, desc: details.backstory, name: details.name, backstory: details.backstory });
+                        } catch (e) {
+                            handleAPIError(e);
+                            throw e;
+                        }
+                    } else {
+                        let desc = GENRE_CHARACTER_PROMPTS[selectedGenre]?.friend;
+                        if (!desc) desc = GENRE_CHARACTER_PROMPTS['Custom'].friend;
+                        try {
+                            setFriend(await aiService.generatePersona(desc, selectedArtStyle, selectedGenre));
+                        } catch (e) {
+                            handleAPIError(e);
+                            throw e;
+                        }
+                    }
                 }}
                 onAutoGenerateVillain={async () => {
-                    let desc = GENRE_CHARACTER_PROMPTS[selectedGenre]?.villain;
-                    if (!desc) desc = GENRE_CHARACTER_PROMPTS['Custom'].villain;
-                    setVillain(await aiService.generatePersona(desc, selectedArtStyle, selectedGenre));
+                    if (villainRef.current?.base64) {
+                        soundManager.play('magic');
+                        try {
+                            const langName = LANGUAGES.find(l => l.code === selectedLanguage)?.name || "English";
+                            const details = await aiService.generateCharacterDetailsFromImage(villainRef.current.base64, selectedGenre, langName, villainRef.current.mimeType);
+                            setVillain({ ...villainRef.current, desc: details.backstory, name: details.name, backstory: details.backstory });
+                        } catch (e) {
+                            handleAPIError(e);
+                            throw e;
+                        }
+                    } else {
+                        let desc = GENRE_CHARACTER_PROMPTS[selectedGenre]?.villain;
+                        if (!desc) desc = GENRE_CHARACTER_PROMPTS['Custom'].villain;
+                        try {
+                            setVillain(await aiService.generatePersona(desc, selectedArtStyle, selectedGenre));
+                        } catch (e) {
+                            handleAPIError(e);
+                            throw e;
+                        }
+                    }
                 }}
                 onGenerateBios={async () => {
                     const bios = await aiService.generateCharacterBios(selectedGenre, storyTone, LANGUAGES.find(l=>l.code===selectedLanguage)!.name, !!friend, !!villain);
@@ -790,10 +830,10 @@ const InfiniteHeroesGame: React.FC = () => {
             {historyRef.current.length > 2 && currentSheetIndex > 1 && !showSetup && (
                 <button 
                     onClick={handleUndo} 
-                    className="fixed bottom-6 left-6 z-[150] bg-orange-500 text-white font-comic text-xl px-4 py-2 border-4 border-black shadow-[4px_4px_0px_black] hover:scale-105 active:scale-95 transition-transform flex items-center gap-2"
+                    className="fixed bottom-6 left-6 z-[150] bg-orange-500 text-white font-comic text-xl md:text-2xl px-4 md:px-6 py-2 md:py-3 border-4 border-black shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] hover:bg-orange-400 active:scale-95 transition-all flex items-center gap-2 transform -rotate-2"
                     aria-label="Undo Turn"
                 >
-                    <span aria-hidden="true">↩️</span> UNDO TURN
+                    <span aria-hidden="true" className="text-2xl md:text-3xl drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">↩️</span> UNDO TURN
                 </button>
             )}
 
@@ -812,7 +852,7 @@ const InfiniteHeroesGame: React.FC = () => {
             }} />}
             {showSettings && <TTSSettingsDialog settings={ttsSettings} achievements={worldState.achievements} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} lang={selectedLanguage} />}
             {showExport && <ExportDialog onClose={() => setShowExport(false)} onExport={handleExport} isExporting={isExporting} lang={selectedLanguage} />}
-            {showVideoGenerator && <VideoGenerator comicFaces={comicFaces} onClose={() => setShowVideoGenerator(false)} />}
+            {showVideoGenerator && <VideoGenerator comicFaces={comicFaces} onClose={() => setShowVideoGenerator(false)} lang={selectedLanguage} />}
             {activeChat && <CharacterChatDialog persona={activeChat.persona} role={activeChat.role} onClose={() => setActiveChat(null)} onSendMessage={msg => aiService.generateCharacterResponse(activeChat.persona, activeChat.role, msg, historyRef.current[historyRef.current.length-1]?.narrative?.panels[0]?.description || "", selectedGenre, LANGUAGES.find(l=>l.code===selectedLanguage)!.name)} onReadAloud={handleReadAloud} lang={selectedLanguage} />}
         </div>
     );

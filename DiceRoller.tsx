@@ -35,21 +35,28 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onComplete }) => {
     }, [onComplete]);
 
     return (
-        <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-            <div className={`transform transition-all duration-300 ${isRolling ? 'animate-bounce' : 'scale-150'}`}>
+        <div 
+            className="fixed inset-0 z-[700] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            role="alert"
+            aria-live="assertive"
+            aria-label={isRolling ? "Rolling dice..." : `Dice result: ${value}. ${value >= 10 ? 'Success' : 'Failure'}`}
+        >
+            <div className={`transform transition-all duration-300 ${isRolling ? 'animate-bounce' : 'scale-[1.8] rotate-[-5deg]'}`}>
                 {/* SVG D20 Icon */}
-                <div className="relative w-40 h-40">
-                    <svg viewBox="0 0 100 100" className={`w-full h-full drop-shadow-[0_0_20px_rgba(255,215,0,0.5)] ${isRolling ? 'animate-spin' : ''}`} style={{animationDuration: '0.5s'}}>
-                        <path d="M50 5 L93 25 L93 75 L50 95 L7 75 L7 25 Z" fill="#DC2626" stroke="black" strokeWidth="4" />
-                        <path d="M50 5 L50 95 M7 25 L93 25 M7 75 L93 75 L50 50 L7 25" stroke="black" strokeWidth="2" fill="none" opacity="0.3" />
+                <div className="relative w-48 h-48">
+                    <svg viewBox="0 0 100 100" className={`w-full h-full drop-shadow-[8px_8px_0px_rgba(255,255,255,1)] ${isRolling ? 'animate-spin' : ''}`} style={{animationDuration: '0.3s'}} aria-hidden="true">
+                        <path d="M50 5 L93 25 L93 75 L50 95 L7 75 L7 25 Z" fill="#EF4444" stroke="black" strokeWidth="4" />
+                        <path d="M50 5 L50 95 M7 25 L93 25 M7 75 L93 75 L50 50 L7 25" stroke="black" strokeWidth="3" fill="none" opacity="0.5" />
+                        <path d="M50 5 L93 25 L50 50 Z" fill="#FCA5A5" opacity="0.4" />
+                        <path d="M7 25 L50 5 L50 50 Z" fill="#991B1B" opacity="0.4" />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="font-comic text-5xl font-bold text-white drop-shadow-[2px_2px_0px_black]">{value}</span>
+                        <span className="font-comic text-6xl font-black text-white drop-shadow-[4px_4px_0px_black]">{value}</span>
                     </div>
                 </div>
                 {!isRolling && (
-                    <div className="text-center mt-4">
-                        <span className={`px-4 py-1 border-2 border-black font-comic text-xl font-bold ${value >= 10 ? 'bg-green-400 text-black' : 'bg-red-500 text-white'}`}>
+                    <div className="text-center mt-8 absolute left-1/2 -translate-x-1/2 whitespace-nowrap z-10">
+                        <span className={`inline-block px-6 py-3 border-[6px] border-black font-comic text-4xl font-black shadow-[8px_8px_0px_rgba(0,0,0,1)] transform ${value >= 10 ? 'bg-green-400 text-black rotate-3' : 'bg-red-500 text-white -rotate-3'}`}>
                             {value >= 10 ? 'SUCCESS!' : 'FAILURE...'}
                         </span>
                     </div>

@@ -31,9 +31,9 @@ export const callWithRetry = async <T,>(fn: () => Promise<T>, retries = 3, initi
 };
 
 const getAI = () => {
-    const key = localStorage.getItem('gemini_api_key') || process.env.API_KEY;
+    const key = process.env.API_KEY;
     if (!key) {
-        throw new Error("API_KEY_INVALID: Please enter a valid API Key in settings.");
+        throw new Error("API_KEY_INVALID: Please select a valid API Key.");
     }
     return new GoogleGenAI({ apiKey: key });
 };
@@ -158,18 +158,81 @@ export const generatePersona = async (desc: string, artStyle: string, genre: str
     return { base64: part.inlineData.data, desc };
 };
 
-export const describeCharacter = async (base64: string): Promise<string> => {
+export const generateCharacterDetailsFromImage = async (base64: string, genre: string, langName: string, mimeType: string = 'image/jpeg'): Promise<{ name: string, backstory: string }> => {
+    const ai = getAI();
+    const prompt = `Analyze this character image for a ${genre} comic. 
+    1. Give them a cool, fitting name in ${langName}.
+    2. Write a 2-3 sentence backstory/description in ${langName} based on their appearance.
+    Return JSON: { "name": "...", "backstory": "..." }`;
+    
+    const res = await ai.models.generateContent({
+        model: MODEL_VISION_NAME,
+        contents: {
+            parts: [
+                { inlineData: { mimeType, data: base64 } },
+                { text: prompt }
+            ]
+        },
+        config: { responseMimeType: 'application/json' }
+    });
+    
+    try {
+        return JSON.parse(res.text?.replace(/```json/g, '').replace(/```/g, '').trim() || '{"name": "Traveler", "backstory": "A mysterious character."}');
+    } catch (e) {
+        console.error("Failed to parse character details from image", e);
+        return { name: "Traveler", backstory: res.text || "A mysterious character." };
+    }
+};
+
+export const describeCharacter = async (base64: string, mimeType: string = 'image/jpeg'): Promise<string> => {
     const ai = getAI();
     const res = await ai.models.generateContent({
         model: MODEL_VISION_NAME,
         contents: {
             parts: [
-                { inlineData: { mimeType: 'image/jpeg', data: base64 } },
+                { inlineData: { mimeType, data: base64 } },
                 { text: "Describe this character's physical appearance in detail for a comic book artist. Focus on clothing, face, and distinctive features." }
             ]
         }
     });
     return res.text || "A mysterious character.";
+};
+
+export const generateComicTitle = async (heroName: string, genre: string, langName: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = `Generate a catchy, dramatic comic book title for a ${genre} comic starring a hero named '${heroName}'. Return ONLY the title in ${langName}, nothing else. No quotes.`;
+    const res = await callWithRetry(() => ai.models.generateContent({ model: MODEL_TEXT_NAME, contents: prompt }));
+    return res.text?.trim().replace(/^["']|["']$/g, '') || `${heroName}'s Adventure`;
+};
+
+export const generateCoverImage = async (title: string, comicName: string, artStyle: string, genre: string, hero: Persona | null, friend: Persona | null, villain: Persona | null, worldState: WorldState, aspectRatio: string = '3:4'): Promise<string> => {
+    const parts = [];
+    
+    if (hero?.base64) {
+        const label = hero.locked ? "Strict Reference Hero (Main Character):" : "Reference Hero:";
+        parts.push({ text: label }, { inlineData: { mimeType: hero.mimeType || 'image/jpeg', data: hero.base64 } });
+    }
+    if (friend?.base64) {
+        const label = friend.locked ? "Strict Reference Ally:" : "Reference Ally:";
+        parts.push({ text: label }, { inlineData: { mimeType: friend.mimeType || 'image/jpeg', data: friend.base64 } });
+    }
+    if (villain?.base64) {
+        const label = villain.locked ? "Strict Reference Villain:" : "Reference Villain:";
+        parts.push({ text: label }, { inlineData: { mimeType: villain.mimeType || 'image/jpeg', data: villain.base64 } });
+    }
+
+    let prompt = `A comic book cover for '${comicName}'. Title: '${title}'. Style: ${artStyle}. Genre: ${genre}. Featuring the hero prominently. The text '${comicName}' and '${title}' should be clearly visible and stylized appropriately for the genre.`;
+    
+    if (hero?.locked || friend?.locked || villain?.locked) {
+        prompt += " IMPORTANT: The provided reference images for locked characters must be followed STRICTLY for facial features, clothing, and style.";
+    }
+
+    parts.push({ text: prompt });
+    
+    const ai = getAI();
+    const res = await callWithRetry(() => ai.models.generateContent({ model: MODEL_IMAGE_GEN_NAME, contents: { parts }, config: { imageConfig: { aspectRatio } } }));
+    const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+    return part?.inlineData?.data ? `data:image/png;base64,${part.inlineData.data}` : '';
 };
 
 export const generateImage = async (panelDesc: string, artStyle: string, genre: string, hero: Persona | null, friend: Persona | null, villain: Persona | null, worldState: WorldState, aspectRatio: string = '1:1'): Promise<string> => {
@@ -178,15 +241,15 @@ export const generateImage = async (panelDesc: string, artStyle: string, genre: 
     // Include all character references if they exist, prioritizing locked ones in text description
     if (hero?.base64) {
         const label = hero.locked ? "Strict Reference Hero (Main Character):" : "Reference Hero:";
-        parts.push({ text: label }, { inlineData: { mimeType: 'image/jpeg', data: hero.base64 } });
+        parts.push({ text: label }, { inlineData: { mimeType: hero.mimeType || 'image/jpeg', data: hero.base64 } });
     }
     if (friend?.base64) {
         const label = friend.locked ? "Strict Reference Ally:" : "Reference Ally:";
-        parts.push({ text: label }, { inlineData: { mimeType: 'image/jpeg', data: friend.base64 } });
+        parts.push({ text: label }, { inlineData: { mimeType: friend.mimeType || 'image/jpeg', data: friend.base64 } });
     }
     if (villain?.base64) {
         const label = villain.locked ? "Strict Reference Villain:" : "Reference Villain:";
-        parts.push({ text: label }, { inlineData: { mimeType: 'image/jpeg', data: villain.base64 } });
+        parts.push({ text: label }, { inlineData: { mimeType: villain.mimeType || 'image/jpeg', data: villain.base64 } });
     }
 
     let prompt = `Style: ${artStyle}. Genre: ${genre}. Scene: ${panelDesc}. NO TEXT.`;
@@ -225,7 +288,12 @@ export const generateVeoVideo = async (base64Data: string, sceneDescription: str
         operation = await ai.operations.getVideosOperation({ operation });
     }
     const uri = operation.response?.generatedVideos?.[0]?.video?.uri;
-    const vidRes = await fetch(`${uri}&key=${localStorage.getItem('gemini_api_key') || process.env.API_KEY}`);
+    const vidRes = await fetch(uri as string, {
+        method: 'GET',
+        headers: {
+            'x-goog-api-key': process.env.API_KEY || '',
+        },
+    });
     const blob = await vidRes.blob();
     return URL.createObjectURL(blob);
 };
