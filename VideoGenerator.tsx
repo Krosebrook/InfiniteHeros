@@ -754,11 +754,11 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                 id="layout-mode"
                                 value={layoutMode} 
                                 onChange={e => setLayoutMode(e.target.value as any)} 
-                                className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-yellow-50 focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-yellow-50 text-black focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                             >
-                                <option value="sequential">{t(lang, "SEQUENTIAL")}</option>
-                                <option value="dynamic">{t(lang, "DYNAMIC")}</option>
-                                <option value="full-page">{t(lang, "FULL_PAGE")}</option>
+                                <option value="sequential" className="text-black bg-white">{t(lang, "SEQUENTIAL")}</option>
+                                <option value="dynamic" className="text-black bg-white">{t(lang, "DYNAMIC")}</option>
+                                <option value="full-page" className="text-black bg-white">{t(lang, "FULL_PAGE")}</option>
                             </select>
                         </div>
                         
@@ -768,11 +768,11 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                 id="aspect-ratio"
                                 value={aspectRatio} 
                                 onChange={e => setAspectRatio(e.target.value)} 
-                                className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-blue-50 focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-blue-50 text-black focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                             >
-                                <option value="16:9">16:9 (Landscape)</option>
-                                <option value="9:16">9:16 (Vertical)</option>
-                                <option value="1:1">1:1 (Square)</option>
+                                <option value="16:9" className="text-black bg-white">16:9 (Landscape)</option>
+                                <option value="9:16" className="text-black bg-white">9:16 (Vertical)</option>
+                                <option value="1:1" className="text-black bg-white">1:1 (Square)</option>
                             </select>
                         </div>
                         
@@ -820,11 +820,11 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                 id="transition-type"
                                 value={transitionType} 
                                 onChange={e => setTransitionType(e.target.value)} 
-                                className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-orange-50 focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-orange-50 text-black focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                             >
-                                <option value="random">{t(lang, "RANDOM_MIX")}</option>
+                                <option value="random" className="text-black bg-white">{t(lang, "RANDOM_MIX")}</option>
                                 {TRANSITION_TYPES.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                    <option key={t.id} value={t.id} className="text-black bg-white">{t.name}</option>
                                 ))}
                             </select>
                         </div>
@@ -855,12 +855,12 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                         id="bgm-track"
                                         value={bgmTrack} 
                                         onChange={e => setBgmTrack(e.target.value)} 
-                                        className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-teal-50 focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                        className="w-full p-3 border-4 border-black font-comic font-bold text-sm md:text-base bg-teal-50 text-black focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                                     >
-                                        <option value="">{t(lang, "NONE")}</option>
-                                        <option value="https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3">{t(lang, "ACTION")}</option>
-                                        <option value="https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3">{t(lang, "SUSPENSE")}</option>
-                                        <option value="https://cdn.pixabay.com/download/audio/2022/01/21/audio_31743c58be.mp3">{t(lang, "COMEDY")}</option>
+                                        <option value="" className="text-black bg-white">{t(lang, "NONE")}</option>
+                                        <option value="https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3" className="text-black bg-white">{t(lang, "ACTION")}</option>
+                                        <option value="https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3" className="text-black bg-white">{t(lang, "SUSPENSE")}</option>
+                                        <option value="https://cdn.pixabay.com/download/audio/2022/01/21/audio_31743c58be.mp3" className="text-black bg-white">{t(lang, "COMEDY")}</option>
                                     </select>
                                 </div>
                                 <div>
@@ -956,14 +956,14 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                                 newScenes[idx].layout = e.target.value;
                                                 setScenes(newScenes);
                                             }}
-                                            className="w-full p-3 border-4 border-black font-comic font-bold text-base md:text-lg bg-white focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                            className="w-full p-3 border-4 border-black font-comic font-bold text-base md:text-lg bg-white text-black focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                                             aria-label={`Layout for scene ${idx + 1}`}
                                         >
                                             {Object.keys(LAYOUT_TEMPLATES).filter(l => {
                                                 const slots = LAYOUT_TEMPLATES[l].slots.length;
                                                 return slots >= scene.panels.length;
                                             }).map(l => (
-                                                <option key={l} value={l}>{l.replace('-', ' ').toUpperCase()}</option>
+                                                <option key={l} value={l} className="text-black bg-white">{l.replace('-', ' ').toUpperCase()}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -1002,7 +1002,7 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                                     newScenes[idx].duration = parseInt(e.target.value) || 1000;
                                                     setScenes(newScenes);
                                                 }}
-                                                className="w-24 p-2 border-4 border-black font-comic text-base md:text-lg font-black text-center bg-white focus:ring-4 focus:ring-red-500 outline-none shadow-[2px_2px_0px_rgba(0,0,0,1)]"
+                                                className="w-24 p-2 border-4 border-black font-comic text-base md:text-lg font-black text-center bg-white text-black focus:ring-4 focus:ring-red-500 outline-none shadow-[2px_2px_0px_rgba(0,0,0,1)]"
                                                 aria-label={`Numeric duration for scene ${idx + 1}`}
                                             />
                                         </div>
@@ -1018,11 +1018,11 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                                 newScenes[idx].transition = e.target.value;
                                                 setScenes(newScenes);
                                             }}
-                                            className="w-full p-3 border-4 border-black font-comic font-bold text-base md:text-lg bg-white focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                            className="w-full p-3 border-4 border-black font-comic font-bold text-base md:text-lg bg-white text-black focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                                             aria-label={`Transition for scene ${idx + 1}`}
                                         >
                                             {TRANSITION_TYPES.map(t => (
-                                                <option key={t.id} value={t.id}>{t.name.toUpperCase()}</option>
+                                                <option key={t.id} value={t.id} className="text-black bg-white">{t.name.toUpperCase()}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -1062,11 +1062,11 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ comicFaces, onCl
                                                     newScenes[idx].sfxUrl = sfx?.url || '';
                                                     setScenes(newScenes);
                                                 }}
-                                                className="flex-1 p-3 border-4 border-black font-comic font-bold text-base md:text-lg bg-white focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
+                                                className="flex-1 p-3 border-4 border-black font-comic font-bold text-base md:text-lg bg-white text-black focus:ring-4 focus:ring-red-500 outline-none cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                                                 aria-label={`Sound effect for scene ${idx + 1}`}
                                             >
                                                 {SFX_LIBRARY.map(s => (
-                                                    <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>
+                                                    <option key={s.id} value={s.id} className="text-black bg-white">{s.name.toUpperCase()}</option>
                                                 ))}
                                             </select>
                                             <button 

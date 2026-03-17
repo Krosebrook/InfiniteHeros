@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ComicFace, Bubble, ASPECT_RATIOS } from './types';
 import { LoadingFX } from './LoadingFX';
 import { soundManager } from './SoundManager';
+import { t } from './translations';
 
 interface PanelProps {
     face?: ComicFace;
@@ -24,6 +25,7 @@ interface PanelProps {
     onReadAloud: (text: string, voiceName?: string) => Promise<void>;
     onExportImages?: () => void;
     onBubbleUpdate?: (pageId: string, bubbles: Bubble[]) => void;
+    lang: string;
 }
 
 const ComicSkeleton = ({ message, isAnimating = true }: { message: string, isAnimating?: boolean }) => (
@@ -49,7 +51,7 @@ const ComicSkeleton = ({ message, isAnimating = true }: { message: string, isAni
 
 export const Panel: React.FC<PanelProps> = ({ 
     face, allFaces, onChoice, onOpenBook, onDownload, onReset, 
-    onAnimate, onRegenerate, onRemix, onReviseScript, onReadAloud, onExportImages, onBubbleUpdate
+    onAnimate, onRegenerate, onRemix, onReviseScript, onReadAloud, onExportImages, onBubbleUpdate, lang
 }) => {
     const [isRemixing, setIsRemixing] = useState(false);
     const [isRevisingScript, setIsRevisingScript] = useState(false);
@@ -270,7 +272,7 @@ export const Panel: React.FC<PanelProps> = ({
             '3_hybrid': 'grid-cols-2 grid-rows-2 gap-2'
         }[face.layout] || 'grid-cols-1';
 
-        const loadingMessages = ['Drawing...', 'Inking...', 'Coloring...'];
+        const loadingMessages = [t(lang, "DRAWING"), t(lang, "INKING"), t(lang, "COLORING")];
 
         return (
             <div className={`grid w-full h-full bg-white ${layoutClass} p-1`}>
@@ -288,7 +290,7 @@ export const Panel: React.FC<PanelProps> = ({
                              ) : isGenerating ? (
                                 <div className="w-full h-full"><ComicSkeleton message={loadingMsg} isAnimating={true} /></div>
                              ) : (
-                                <div className="w-full h-full"><ComicSkeleton message="WAITING..." isAnimating={false} /></div>
+                                <div className="w-full h-full"><ComicSkeleton message={t(lang, "WAITING")} isAnimating={false} /></div>
                              )}
                         </div>
                     );
@@ -300,7 +302,7 @@ export const Panel: React.FC<PanelProps> = ({
     if (!face) return <div className="w-full h-full bg-gray-950" />;
     
     if (face.type === 'letters') {
-        if (face.isLoading && !face.lettersContent) return <div className="w-full h-full"><LoadingFX message="Sorting Mail" /></div>;
+        if (face.isLoading && !face.lettersContent) return <div className="w-full h-full"><LoadingFX message={t(lang, "SORTING_MAIL")} /></div>;
         return (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full h-full bg-[#fdfbf7] p-8 overflow-y-auto font-serif relative">
                 <div className="border-b-4 border-black mb-6 pb-2"><h2 className="font-comic text-4xl text-black">LETTERS</h2></div>
@@ -310,7 +312,7 @@ export const Panel: React.FC<PanelProps> = ({
     }
 
     if (face.isLoading && (!face.panels || face.panels.length === 0) && !face.imageUrl && !face.videoUrl) {
-        return <div className="w-full h-full"><LoadingFX message={face.type === 'cover' ? "Painting Cover" : "Inking Page"} /></div>;
+        return <div className="w-full h-full"><LoadingFX message={face.type === 'cover' ? t(lang, "PAINTING_COVER") : t(lang, "INKING_PAGE")} /></div>;
     }
 
     const isFullBleed = face.type === 'cover' || face.type === 'back_cover';
@@ -408,11 +410,11 @@ export const Panel: React.FC<PanelProps> = ({
             
             {(isRemixing || isRevisingScript) && (
                 <div className="absolute inset-0 bg-black/80 z-40 flex flex-col items-center justify-center p-6">
-                    <h3 className="text-white font-comic text-2xl mb-4">{isRemixing ? "REMIX IMAGE" : "REVISE SCRIPT"}</h3>
-                    <textarea value={isRemixing ? remixPrompt : scriptPrompt} onChange={(e) => isRemixing ? setRemixPrompt(e.target.value) : setScriptPrompt(e.target.value)} className="w-full h-24 p-2 mb-4 rounded text-black focus:outline-none focus:ring-4 focus:ring-yellow-400" placeholder="Instruction..." />
+                    <h3 className="text-white font-comic text-2xl mb-4">{isRemixing ? t(lang, "REMIX_IMAGE") : t(lang, "REVISE_SCRIPT")}</h3>
+                    <textarea value={isRemixing ? remixPrompt : scriptPrompt} onChange={(e) => isRemixing ? setRemixPrompt(e.target.value) : setScriptPrompt(e.target.value)} className="w-full h-24 p-2 mb-4 rounded text-black focus:outline-none focus:ring-4 focus:ring-yellow-400" placeholder={t(lang, "INSTRUCTION_PLACEHOLDER")} />
                     <div className="flex gap-2 w-full">
-                        <button onClick={() => { soundManager.play('click'); setIsRemixing(false); setIsRevisingScript(false); }} className="flex-1 py-2 bg-gray-600 text-white">CANCEL</button>
-                        <button onClick={isRemixing ? handleRemixSubmit : handleScriptSubmit} className="flex-1 py-2 bg-yellow-400 text-black">GO</button>
+                        <button onClick={() => { soundManager.play('click'); setIsRemixing(false); setIsRevisingScript(false); }} className="flex-1 py-2 bg-gray-600 text-white">{t(lang, "CANCEL")}</button>
+                        <button onClick={isRemixing ? handleRemixSubmit : handleScriptSubmit} className="flex-1 py-2 bg-yellow-400 text-black">{t(lang, "GO")}</button>
                     </div>
                 </div>
             )}
@@ -432,17 +434,17 @@ export const Panel: React.FC<PanelProps> = ({
                         onClick={e => e.stopPropagation()}
                         value={selectedAspectRatio} 
                         onChange={e => { soundManager.play('click'); setSelectedAspectRatio(e.target.value); }}
-                        className="control-btn w-auto h-10 md:h-10 text-xs px-2 font-comic font-bold bg-gray-100 hover:bg-yellow-200 border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer"
+                        className="control-btn w-auto h-10 md:h-10 text-xs px-2 font-comic font-bold bg-gray-100 text-black hover:bg-yellow-200 border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer"
                         title="Target Aspect Ratio"
                     >
-                        {ASPECT_RATIOS.map(r => <option key={r} value={r}>{r}</option>)}
+                        {ASPECT_RATIOS.map(r => <option key={r} value={r} className="text-black bg-white">{r}</option>)}
                     </select>
                 </div>
             )}
             
             {face.isDecisionPage && face.choices.length > 0 && (
                 <div className={`absolute bottom-0 inset-x-0 p-4 md:p-6 flex flex-col gap-2 md:gap-3 items-center z-20 ${face.resolvedChoice ? 'pointer-events-none opacity-0' : 'bg-gradient-to-t from-black/90 to-transparent'}`}>
-                    <p className="text-white font-comic text-lg md:text-xl animate-pulse">MAKE YOUR CHOICE</p>
+                    <p className="text-white font-comic text-lg md:text-xl animate-pulse">{t(lang, "MAKE_YOUR_CHOICE")}</p>
                     {face.choices.map((choice, i) => (
                         <button key={i} onClick={(e) => { e.stopPropagation(); soundManager.play('success'); if(face.pageIndex) onChoice(face.pageIndex, choice); }} className={`comic-btn w-full py-3 md:py-4 text-base md:text-lg font-bold focus:outline-none focus:ring-4 focus:ring-white ${i===0?'bg-yellow-400 text-black':'bg-blue-500 text-white'}`}>{choice}</button>
                     ))}

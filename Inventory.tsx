@@ -21,7 +21,7 @@ export const Inventory: React.FC<InventoryProps> = ({ items, status, lang }) => 
 
     return (
         <aside 
-            className="fixed top-20 md:top-24 left-2 md:left-4 z-[90] flex flex-col gap-4 md:gap-6 font-sans max-w-[160px] md:max-w-[220px] pointer-events-none" 
+            className="md:hidden fixed top-20 md:top-24 left-2 md:left-4 z-[90] flex flex-col gap-4 md:gap-6 font-sans max-w-[160px] md:max-w-[220px] pointer-events-none" 
             aria-label="World State"
         >
             {/* Status Effects */}

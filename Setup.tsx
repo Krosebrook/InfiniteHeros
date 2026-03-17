@@ -42,6 +42,9 @@ interface SetupProps {
     onToggleHeroLock: () => void;
     onToggleFriendLock: () => void;
     onToggleVillainLock: () => void;
+    onUpdateHero: (p: Persona) => void;
+    onUpdateFriend: (p: Persona) => void;
+    onUpdateVillain: (p: Persona) => void;
 }
 
 // Map genres to recommended art styles for a more curated experience
@@ -100,15 +103,26 @@ interface CharacterUploaderProps {
     isRequired?: boolean;
     onToggleLock: () => void;
     lang: string;
+    onUpdatePersona?: (updated: Persona) => void;
 }
 
 const CharacterUploader: React.FC<CharacterUploaderProps> = ({ 
-    title, role, colorClass, borderColor, textColor, persona, onUpload, onAutoGenerate, isRequired, onToggleLock, lang
+    title, role, colorClass, borderColor, textColor, persona, onUpload, onAutoGenerate, isRequired, onToggleLock, lang, onUpdatePersona
 }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState("");
+    const [editBackstory, setEditBackstory] = useState("");
     const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (persona) {
+            setEditName(persona.name || "");
+            setEditBackstory(persona.backstory || "");
+        }
+    }, [persona]);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -213,9 +227,61 @@ const CharacterUploader: React.FC<CharacterUploaderProps> = ({
                          </div>
                          
                          {persona.name && (
-                             <div className="bg-yellow-100 p-2 border border-black w-full text-left rotate-1">
-                                 <p className="font-comic text-lg leading-none">{persona.name}</p>
-                                 <p className="font-sans text-[10px] leading-tight text-gray-600 line-clamp-3">{persona.backstory}</p>
+                             <div className="bg-yellow-100 p-2 border border-black w-full text-left rotate-1 relative group">
+                                 {isEditing ? (
+                                     <div className="flex flex-col gap-1">
+                                         <input 
+                                             type="text" 
+                                             value={editName} 
+                                             onChange={(e) => setEditName(e.target.value)} 
+                                             className="font-comic text-sm border-2 border-black p-1 w-full"
+                                             placeholder="Character Name"
+                                         />
+                                         <textarea 
+                                             value={editBackstory} 
+                                             onChange={(e) => setEditBackstory(e.target.value)} 
+                                             className="font-sans text-[10px] border-2 border-black p-1 w-full resize-none h-16"
+                                             placeholder="Character Backstory"
+                                         />
+                                         <div className="flex gap-1 mt-1">
+                                             <button 
+                                                 onClick={() => {
+                                                     if (onUpdatePersona) {
+                                                         onUpdatePersona({ ...persona, name: editName, backstory: editBackstory, desc: editBackstory });
+                                                     }
+                                                     setIsEditing(false);
+                                                 }}
+                                                 className="bg-green-500 text-white text-[10px] font-bold px-2 py-1 border-2 border-black hover:bg-green-400 flex-1"
+                                             >
+                                                 SAVE
+                                             </button>
+                                             <button 
+                                                 onClick={() => {
+                                                     setEditName(persona.name || "");
+                                                     setEditBackstory(persona.backstory || "");
+                                                     setIsEditing(false);
+                                                 }}
+                                                 className="bg-red-500 text-white text-[10px] font-bold px-2 py-1 border-2 border-black hover:bg-red-400 flex-1"
+                                             >
+                                                 CANCEL
+                                             </button>
+                                         </div>
+                                     </div>
+                                 ) : (
+                                     <>
+                                         <p className="font-comic text-lg leading-none">{persona.name}</p>
+                                         <p className="font-sans text-[10px] leading-tight text-gray-600 line-clamp-3">{persona.backstory}</p>
+                                         {!persona.locked && onUpdatePersona && (
+                                             <button 
+                                                 onClick={() => setIsEditing(true)}
+                                                 className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-white border border-black p-1 text-xs hover:bg-gray-200 transition-opacity"
+                                                 aria-label="Edit character details"
+                                             >
+                                                 ✏️
+                                             </button>
+                                         )}
+                                     </>
+                                 )}
                              </div>
                          )}
 
@@ -349,6 +415,7 @@ export const Setup: React.FC<SetupProps> = (props) => {
                         isRequired={true}
                         onToggleLock={props.onToggleHeroLock}
                         lang={props.selectedLanguage}
+                        onUpdatePersona={props.onUpdateHero}
                     />
 
                     <CharacterUploader 
@@ -362,6 +429,7 @@ export const Setup: React.FC<SetupProps> = (props) => {
                         onAutoGenerate={props.onAutoGenerateFriend}
                         onToggleLock={props.onToggleFriendLock}
                         lang={props.selectedLanguage}
+                        onUpdatePersona={props.onUpdateFriend}
                     />
 
                     <div className="flex flex-col gap-3">
@@ -376,6 +444,7 @@ export const Setup: React.FC<SetupProps> = (props) => {
                             onAutoGenerate={props.onAutoGenerateVillain}
                             onToggleLock={props.onToggleVillainLock}
                             lang={props.selectedLanguage}
+                            onUpdatePersona={props.onUpdateVillain}
                         />
                         <button onClick={() => { playClick(); props.onGenerateBios(); }} 
                                 className="comic-btn bg-white text-black text-sm px-4 py-2 hover:bg-gray-100 flex items-center justify-center gap-2 mt-auto"
@@ -392,32 +461,32 @@ export const Setup: React.FC<SetupProps> = (props) => {
                      <div className="absolute -top-4 -left-4 bg-black text-white px-3 py-1 font-comic text-lg uppercase transform -rotate-6 border-2 border-white shadow-md">World Settings</div>
                      <div>
                         <label htmlFor="genre-select" className="font-comic text-lg mb-1 font-bold text-gray-800 block uppercase tracking-wide">{t(props.selectedLanguage, "GENRE")}</label>
-                        <select id="genre-select" value={props.selectedGenre} onChange={(e) => { playClick(); props.onGenreChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
-                            {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+                        <select id="genre-select" value={props.selectedGenre} onChange={(e) => { playClick(); props.onGenreChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white text-black cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                            {GENRES.map(g => <option key={g} value={g} className="text-black bg-white">{g}</option>)}
                         </select>
                     </div>
                     <div>
                         <label htmlFor="style-select" className="font-comic text-lg mb-1 font-bold text-gray-800 block uppercase tracking-wide">{t(props.selectedLanguage, "ART_STYLE")}</label>
-                        <select id="style-select" value={props.selectedArtStyle} onChange={(e) => { playClick(); props.onArtStyleChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
-                            {filteredStyles.map(s => <option key={s} value={s}>{s}</option>)}
+                        <select id="style-select" value={props.selectedArtStyle} onChange={(e) => { playClick(); props.onArtStyleChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white text-black cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                            {filteredStyles.map(s => <option key={s} value={s} className="text-black bg-white">{s}</option>)}
                         </select>
                     </div>
                     <div>
                         <label htmlFor="lang-select" className="font-comic text-lg mb-1 font-bold text-gray-800 block uppercase tracking-wide">{t(props.selectedLanguage, "LANGUAGE")}</label>
-                        <select id="lang-select" value={props.selectedLanguage} onChange={(e) => { playClick(); props.onLanguageChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
-                            {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
+                        <select id="lang-select" value={props.selectedLanguage} onChange={(e) => { playClick(); props.onLanguageChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white text-black cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                            {LANGUAGES.map(l => <option key={l.code} value={l.code} className="text-black bg-white">{l.name}</option>)}
                         </select>
                     </div>
                     <div>
                         <label htmlFor="layout-select" className="font-comic text-lg mb-1 font-bold text-gray-800 block uppercase tracking-wide">{t(props.selectedLanguage, "LAYOUT")}</label>
-                        <select id="layout-select" value={props.selectedLayout} onChange={(e) => { playClick(); props.onLayoutChange(e.target.value as PanelLayout); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
-                            {PANEL_LAYOUTS.map(l => <option key={l} value={l}>{l.replace('_', ' ').toUpperCase()}</option>)}
+                        <select id="layout-select" value={props.selectedLayout} onChange={(e) => { playClick(); props.onLayoutChange(e.target.value as PanelLayout); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white text-black cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                            {PANEL_LAYOUTS.map(l => <option key={l} value={l} className="text-black bg-white">{l.replace('_', ' ').toUpperCase()}</option>)}
                         </select>
                     </div>
                     <div className="flex flex-col lg:col-span-2">
                         <label htmlFor="tone-select" className="font-comic text-lg mb-1 font-bold text-gray-800 block uppercase tracking-wide">{t(props.selectedLanguage, "STORY_TONE")}</label>
-                        <select id="tone-select" value={props.selectedTone} onChange={(e) => { playClick(); props.onToneChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
-                            {TONES.map(t => <option key={t} value={t}>{t}</option>)}
+                        <select id="tone-select" value={props.selectedTone} onChange={(e) => { playClick(); props.onToneChange(e.target.value); }} className="w-full font-comic text-lg p-2 border-4 border-black uppercase bg-white text-black cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                            {TONES.map(t => <option key={t} value={t} className="text-black bg-white">{t}</option>)}
                         </select>
 
                         {props.selectedGenre === 'Custom' && (
@@ -425,7 +494,7 @@ export const Setup: React.FC<SetupProps> = (props) => {
                                 value={props.customPremise} 
                                 onChange={(e) => props.onPremiseChange(e.target.value)} 
                                 placeholder="Story Premise..." 
-                                className="w-full p-3 border-4 border-black font-comic text-lg h-24 resize-none mt-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-4 focus:ring-yellow-400" 
+                                className="w-full p-3 border-4 border-black font-comic text-lg h-24 resize-none mt-4 text-black shadow-[4px_4px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-4 focus:ring-yellow-400" 
                                 aria-label="Custom Story Premise"
                             />
                         )}

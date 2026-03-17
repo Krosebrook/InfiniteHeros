@@ -62,7 +62,21 @@ export const translations: Record<string, Record<string, string>> = {
     "ASK_ME_ANYTHING": "ASK ME ANYTHING.",
     "INTERROGATE_PLACEHOLDER": "Interrogate or command...",
     "SEND": "SEND",
-    "ERROR_MENTAL_LINK": "ERROR: Mental link severed. Try again later."
+    "ERROR_MENTAL_LINK": "ERROR: Mental link severed. Try again later.",
+    "DRAWING": "Drawing...",
+    "INKING": "Inking...",
+    "COLORING": "Coloring...",
+    "WAITING": "WAITING...",
+    "SORTING_MAIL": "Sorting Mail",
+    "PAINTING_COVER": "Painting Cover",
+    "INKING_PAGE": "Inking Page",
+    "REMIX_IMAGE": "REMIX IMAGE",
+    "REVISE_SCRIPT": "REVISE SCRIPT",
+    "INSTRUCTION_PLACEHOLDER": "Instruction...",
+    "GO": "GO",
+    "MAKE_YOUR_CHOICE": "MAKE YOUR CHOICE",
+    "SUCCESS": "SUCCESS!",
+    "FAILURE": "FAILURE..."
   },
   "es-MX": {
     "INFINITE": "INFINITOS",

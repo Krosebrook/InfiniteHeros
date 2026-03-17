@@ -51,7 +51,7 @@ export const CharacterBios: React.FC<CharacterBiosProps> = ({ hero, friend, vill
 
     return (
         <div 
-            className="fixed inset-0 z-[500] flex items-center justify-center p-2 md:p-10 bg-black/90 backdrop-blur-md animate-in fade-in duration-200" 
+            className="md:hidden fixed inset-0 z-[500] flex items-center justify-center p-2 md:p-10 bg-black/90 backdrop-blur-md animate-in fade-in duration-200" 
             onClick={handleClose}
             role="dialog"
             aria-modal="true"

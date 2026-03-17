@@ -166,59 +166,6 @@ export const Book: React.FC<BookProps> = (props) => {
       <div className="comic-scene" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
         {props.isStarted && (
             <>
-            {/* Desktop Sidebar */}
-            <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} className="hidden md:flex fixed top-4 right-4 z-[100] flex-col gap-4">
-                <div className="bg-black border-4 border-white p-3 flex flex-col gap-2 w-56 shadow-[8px_8px_0px_rgba(0,0,0,1)] transform rotate-2" role="presentation">
-                    <div className="flex justify-between text-xs font-comic font-bold text-yellow-400 uppercase tracking-widest">
-                        <span>{t(props.lang, "HEALTH")}</span>
-                        <span>{props.worldState.health}%</span>
-                    </div>
-                    <div 
-                        className="h-3 bg-gray-800 border-2 border-white overflow-hidden shadow-inner"
-                        role="progressbar"
-                        aria-valuenow={props.worldState.health}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={t(props.lang, "HEALTH")}
-                    >
-                        <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${props.worldState.health}%` }}
-                            className={`h-full ${props.worldState.health < 30 ? 'bg-red-600' : 'bg-green-500'} relative`}
-                        >
-                            <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)', backgroundSize: '10px 10px' }}></div>
-                        </motion.div>
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-3 mt-2">
-                    <button onClick={props.onOpenBio} className="bg-yellow-400 border-4 border-black px-4 py-2 font-comic text-xl hover:bg-yellow-300 hover:-translate-y-1 hover:-translate-x-1 shadow-[6px_6px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-3 transition-all transform -rotate-1" aria-label="Open Character Bios" title="View character biographies and backstories">
-                      <span className="text-2xl drop-shadow-md" aria-hidden="true">👥</span> {t(props.lang, "CAST")}
-                    </button>
-                    <button onClick={props.onOpenInventory} className="bg-orange-400 border-4 border-black px-4 py-2 font-comic text-xl hover:bg-orange-300 hover:-translate-y-1 hover:-translate-x-1 shadow-[6px_6px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-3 transition-all transform rotate-1" aria-label="Open Inventory" title="View your items and status effects">
-                      <span className="text-2xl drop-shadow-md" aria-hidden="true">🎒</span> {t(props.lang, "BAG")}
-                    </button>
-                    <button onClick={props.onOpenMap} className="bg-blue-400 border-4 border-black px-4 py-2 font-comic text-xl hover:bg-blue-300 hover:-translate-y-1 hover:-translate-x-1 shadow-[6px_6px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-3 transition-all transform -rotate-1" aria-label="Open Multiverse Map" title="View the branching paths of your adventure">
-                      <span className="text-2xl drop-shadow-md" aria-hidden="true">🕸️</span> {t(props.lang, "MAP")}
-                    </button>
-                    <button onClick={props.onOpenSettings} className="bg-gray-200 border-4 border-black px-4 py-2 font-comic text-xl hover:bg-white hover:-translate-y-1 hover:-translate-x-1 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex items-center gap-3 transition-all transform rotate-1" aria-label="Open Settings" title="Adjust game settings and audio">
-                      <span className="text-2xl drop-shadow-md" aria-hidden="true">⚙️</span> SETTINGS
-                    </button>
-                    <button onClick={props.onGenerateCover} className="bg-purple-500 border-4 border-black px-4 py-2 font-comic text-xl hover:bg-purple-400 hover:-translate-y-1 hover:-translate-x-1 shadow-[6px_6px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-3 text-white transition-all transform -rotate-1" aria-label="Generate Cover" title="Generate a high-quality painted cover for your comic">
-                      <span className="text-2xl drop-shadow-md" aria-hidden="true">🎨</span> {t(props.lang, "COVER")}
-                    </button>
-                    <button onClick={props.onExportImages} className="bg-green-400 border-4 border-black px-4 py-2 font-comic text-xl hover:bg-green-300 hover:-translate-y-1 hover:-translate-x-1 shadow-[6px_6px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-3 transition-all transform rotate-1" aria-label="Export" title="Export your comic as PDF or ZIP">
-                      <span className="text-2xl drop-shadow-md" aria-hidden="true">📤</span> {t(props.lang, "EXPORT")}
-                    </button>
-                    <button onClick={props.onGenerateVideo} className="bg-red-600 text-white border-4 border-black px-4 py-2 font-comic text-xl hover:bg-red-500 hover:-translate-y-1 hover:-translate-x-1 shadow-[6px_6px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-3 transition-all transform -rotate-1" aria-label="Generate Video" title="Generate a cinematic video trailer for your comic">
-                      <span className="text-2xl drop-shadow-md" aria-hidden="true">🎬</span> VIDEO
-                    </button>
-                    <button onClick={props.onSaveProgress} className="bg-blue-600 text-white border-4 border-black px-4 py-2 font-comic text-xl hover:bg-blue-500 hover:-translate-y-1 hover:-translate-x-1 shadow-[6px_6px_0px_rgba(0,0,0,1)] uppercase flex items-center gap-3 transition-all transform rotate-1" aria-label="Save Progress" title="Save your current adventure to local storage">
-                      <span className="text-2xl drop-shadow-md" aria-hidden="true">💾</span> {t(props.lang, "SAVE")}
-                    </button>
-                </div>
-            </motion.div>
-
             {/* Mobile Bottom Navigation */}
             <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="md:hidden fixed bottom-0 left-0 right-0 z-[150] bg-black border-t-[6px] border-yellow-400 p-2 flex justify-around items-center gap-1 overflow-x-auto no-scrollbar shadow-[0_-4px_10px_rgba(0,0,0,0.5)]" role="navigation" aria-label="Mobile Navigation">
                 <button onClick={props.onOpenBio} className="flex flex-col items-center gap-1 min-w-[50px] active:scale-90 transition-transform" title={t(props.lang, "CAST")} aria-label={t(props.lang, "CAST")}>
@@ -299,6 +246,7 @@ export const Book: React.FC<BookProps> = (props) => {
                             onAnimate={props.onAnimate} onRegenerate={props.onRegenerate} 
                             onRemix={props.onRemix} onReviseScript={props.onReviseScript}
                             onReadAloud={props.onReadAloud} onExportImages={props.onExportImages} onBubbleUpdate={props.onBubbleUpdate}
+                            lang={props.lang}
                           />
                       </div>
                       <div className="back">
@@ -309,6 +257,7 @@ export const Book: React.FC<BookProps> = (props) => {
                             onAnimate={props.onAnimate} onRegenerate={props.onRegenerate} 
                             onRemix={props.onRemix} onReviseScript={props.onReviseScript}
                             onReadAloud={props.onReadAloud} onExportImages={props.onExportImages} onBubbleUpdate={props.onBubbleUpdate}
+                            lang={props.lang}
                           />
                       </div>
                   </motion.div>

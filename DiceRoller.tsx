@@ -6,12 +6,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { soundManager } from './SoundManager';
+import { t } from './translations';
 
 interface DiceRollerProps {
     onComplete: (value: number) => void;
+    lang: string;
 }
 
-export const DiceRoller: React.FC<DiceRollerProps> = ({ onComplete }) => {
+export const DiceRoller: React.FC<DiceRollerProps> = ({ onComplete, lang }) => {
     const [value, setValue] = useState(20);
     const [isRolling, setIsRolling] = useState(true);
 
@@ -57,7 +59,7 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onComplete }) => {
                 {!isRolling && (
                     <div className="text-center mt-8 absolute left-1/2 -translate-x-1/2 whitespace-nowrap z-10">
                         <span className={`inline-block px-6 py-3 border-[6px] border-black font-comic text-4xl font-black shadow-[8px_8px_0px_rgba(0,0,0,1)] transform ${value >= 10 ? 'bg-green-400 text-black rotate-3' : 'bg-red-500 text-white -rotate-3'}`}>
-                            {value >= 10 ? 'SUCCESS!' : 'FAILURE...'}
+                            {value >= 10 ? t(lang, "SUCCESS") : t(lang, "FAILURE")}
                         </span>
                     </div>
                 )}

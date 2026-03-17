@@ -14,6 +14,7 @@ import {
 import { Setup } from './Setup';
 import { Book } from './Book';
 import { CharacterBios } from './CharacterBios';
+import { Sidebar } from './Sidebar';
 import { MultiverseMap } from './MultiverseMap';
 import { useApiKey, ApiKeyProvider } from './useApiKey';
 import { ApiKeyDialog } from './ApiKeyDialog';
@@ -606,26 +607,41 @@ const InfiniteHeroesGame: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 overflow-hidden relative font-sans text-white">
-            {showDialog && <ApiKeyDialog />}
-            {rollingDiceFor && <DiceRoller onComplete={(val) => {
-                setRollingDiceFor(null);
-                proceedWithChoice(rollingDiceFor.pageIndex, rollingDiceFor.choice, { value: val, isSuccess: val >= 10 });
-            }} />}
-            
-            {isStarted && worldState.health < 40 && (
-                <div className="fixed inset-0 pointer-events-none z-[200] transition-opacity duration-1000"
-                     style={{ 
-                         background: `radial-gradient(circle, transparent 40%, rgba(220, 38, 38, ${0.4 * (1 - worldState.health/40)}) 100%)`,
-                         opacity: isStarted ? 1 : 0
-                     }} 
+        <div className="min-h-screen bg-gray-900 overflow-hidden relative font-sans text-white flex">
+            {isStarted && !showSetup && (
+                <Sidebar 
+                    hero={hero} friend={friend} villain={villain} worldState={worldState} lang={selectedLanguage}
+                    onTalkToCharacter={(p, r) => setActiveChat({persona: p, role: r})}
+                    onOpenSettings={() => setShowSettings(true)}
+                    onGenerateCover={handleGenerateCover}
+                    onExportImages={() => setShowExport(true)}
+                    onGenerateVideo={() => setShowVideoGenerator(true)}
+                    onSaveProgress={handleSaveProgress}
+                    onOpenMap={() => {
+                        setShowMap(true);
+                        const branchCount = Object.keys(storyTreeRef.current).length;
+                        if (branchCount > 10) unlockAchievement('multiversalist');
+                    }}
                 />
             )}
+            <div className="flex-1 relative overflow-hidden flex flex-col min-w-0">
+                {showDialog && <ApiKeyDialog />}
+                {rollingDiceFor && <DiceRoller lang={selectedLanguage} onComplete={(val) => {
+                    setRollingDiceFor(null);
+                    proceedWithChoice(rollingDiceFor.pageIndex, rollingDiceFor.choice, { value: val, isSuccess: val >= 10 });
+                }} />}
+                
+                {isStarted && worldState.health < 40 && (
+                    <div className="fixed inset-0 pointer-events-none z-[200] transition-opacity duration-1000"
+                         style={{ 
+                             background: `radial-gradient(circle, transparent 40%, rgba(220, 38, 38, ${0.4 * (1 - worldState.health/40)}) 100%)`,
+                             opacity: isStarted ? 1 : 0
+                         }} 
+                    />
+                )}
 
-            <Inventory items={worldState.inventory} status={worldState.status} />
-
-            <Setup 
-                show={showSetup} isTransitioning={isTransitioning} 
+                <Setup 
+                    show={showSetup} isTransitioning={isTransitioning} 
                 hero={hero} friend={friend} villain={villain}
                 selectedGenre={selectedGenre} selectedArtStyle={selectedArtStyle}
                 selectedLanguage={selectedLanguage} selectedTone={storyTone}
@@ -745,6 +761,9 @@ const InfiniteHeroesGame: React.FC = () => {
                 onToggleHeroLock={() => { if(hero) setHero({...hero, locked: !hero.locked}); }}
                 onToggleFriendLock={() => { if(friend) setFriend({...friend, locked: !friend.locked}); }}
                 onToggleVillainLock={() => { if(villain) setVillain({...villain, locked: !villain.locked}); }}
+                onUpdateHero={(p) => setHero(p)}
+                onUpdateFriend={(p) => setFriend(p)}
+                onUpdateVillain={(p) => setVillain(p)}
             />
 
             <Book 
@@ -752,6 +771,7 @@ const InfiniteHeroesGame: React.FC = () => {
                 isStarted={isStarted} isSetupVisible={showSetup}
                 hero={hero} friend={friend} villain={villain}
                 worldState={worldState}
+                lang={selectedLanguage}
                 onOpenBio={() => setShowBios(true)}
                 onOpenInventory={() => setShowInventory(!showInventory)}
                 onSheetClick={idx => setCurrentSheetIndex(idx)}
@@ -824,21 +844,21 @@ const InfiniteHeroesGame: React.FC = () => {
             />
 
             {isStarted && !showSetup && showInventory && (
-                <Inventory items={worldState.inventory} status={worldState.status} />
+                <Inventory items={worldState.inventory} status={worldState.status} lang={selectedLanguage} />
             )}
 
             {historyRef.current.length > 2 && currentSheetIndex > 1 && !showSetup && (
                 <button 
                     onClick={handleUndo} 
-                    className="fixed bottom-6 left-6 z-[150] bg-orange-500 text-white font-comic text-xl md:text-2xl px-4 md:px-6 py-2 md:py-3 border-4 border-black shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] hover:bg-orange-400 active:scale-95 transition-all flex items-center gap-2 transform -rotate-2"
+                    className="fixed bottom-6 right-6 z-[150] bg-orange-500 text-white font-comic text-xl md:text-2xl px-4 md:px-6 py-2 md:py-3 border-4 border-black shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] hover:bg-orange-400 active:scale-95 transition-all flex items-center gap-2 transform -rotate-2"
                     aria-label="Undo Turn"
                 >
                     <span aria-hidden="true" className="text-2xl md:text-3xl drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">↩️</span> UNDO TURN
                 </button>
             )}
 
-            {showBios && <CharacterBios hero={hero} friend={friend} villain={villain} npcs={worldState.npcs} onClose={() => setShowBios(false)} onTalkToCharacter={(p, r) => setActiveChat({persona: p, role: r})} />}
-            {showMap && <MultiverseMap storyTree={storyTreeRef.current} currentPath={comicFaces} onClose={() => setShowMap(false)} onNodeClick={id => {
+            {showBios && <CharacterBios hero={hero} friend={friend} villain={villain} npcs={worldState.npcs} onClose={() => setShowBios(false)} onTalkToCharacter={(p, r) => setActiveChat({persona: p, role: r})} lang={selectedLanguage} />}
+            {showMap && <MultiverseMap storyTree={storyTreeRef.current} currentPath={comicFaces} onClose={() => setShowMap(false)} lang={selectedLanguage} onNodeClick={id => {
                 const node = storyTreeRef.current[id];
                 if (node) {
                     const path: ComicFace[] = [];
@@ -854,6 +874,7 @@ const InfiniteHeroesGame: React.FC = () => {
             {showExport && <ExportDialog onClose={() => setShowExport(false)} onExport={handleExport} isExporting={isExporting} lang={selectedLanguage} />}
             {showVideoGenerator && <VideoGenerator comicFaces={comicFaces} onClose={() => setShowVideoGenerator(false)} lang={selectedLanguage} />}
             {activeChat && <CharacterChatDialog persona={activeChat.persona} role={activeChat.role} onClose={() => setActiveChat(null)} onSendMessage={msg => aiService.generateCharacterResponse(activeChat.persona, activeChat.role, msg, historyRef.current[historyRef.current.length-1]?.narrative?.panels[0]?.description || "", selectedGenre, LANGUAGES.find(l=>l.code===selectedLanguage)!.name)} onReadAloud={handleReadAloud} lang={selectedLanguage} />}
+            </div>
         </div>
     );
 };
