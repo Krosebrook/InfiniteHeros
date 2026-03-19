@@ -116,6 +116,7 @@ INSTRUCTIONS:
 4. Update Health (delta -20 to +20).
 5. Discover new NPCs if applicable.
 ${preferredLayout ? `6. PREFERRED LAYOUT: ${preferredLayout}` : ''}
+7. Provide 3-4 diverse choices for the player, considering the story's current state and character motivations.
 
 JSON:
 {
@@ -126,7 +127,7 @@ JSON:
      "new_npcs": [{"name": "...", "backstory": "..."}],
      "achievement_id": "risky_roller" | "first_choice" | "survivor" | null
   },
-  "choices": ["...", "..."]
+  "choices": ["Choice 1", "Choice 2", "Choice 3", "Choice 4"]
 }
 `;
     const ai = getAI();

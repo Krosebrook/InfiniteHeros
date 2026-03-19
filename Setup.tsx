@@ -60,37 +60,6 @@ const GENRE_STYLE_MAP: Record<string, string[]> = {
     "Custom": ART_STYLES
 };
 
-const Footer = () => {
-  const [remixIndex, setRemixIndex] = useState(0);
-  const remixes = [
-    "Animate panels with Veo 3",
-    "Localize to Klingon",
-    "Print physical copies",
-    "Add voice narration",
-    "Create a shared universe"
-  ];
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRemixIndex(prev => (prev + 1) % remixes.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="fixed bottom-0 left-0 right-0 bg-black text-white py-2 px-4 flex flex-col md:flex-row justify-between items-center z-[300] border-t-4 border-yellow-400 font-comic">
-        <div className="flex items-center gap-2 text-base md:text-lg">
-            <span className="text-yellow-400 font-bold">REMIX IDEA:</span>
-            <span className="animate-pulse">{remixes[remixIndex]}</span>
-        </div>
-        <div className="flex items-center gap-4 mt-2 md:mt-0">
-            <span className="text-gray-500 text-xs hidden md:inline">Build with Gemini</span>
-            <a href="https://x.com/ammaar" target="_blank" rel="noopener noreferrer" className="text-white hover:text-yellow-400 transition-colors text-lg">Created by @ammaar</a>
-        </div>
-    </div>
-  );
-};
-
 interface CharacterUploaderProps {
     title: string;
     role: string;
@@ -514,8 +483,6 @@ export const Setup: React.FC<SetupProps> = (props) => {
             </div>
           </div>
         </div>
-
-        <Footer />
         </>
     );
 }
